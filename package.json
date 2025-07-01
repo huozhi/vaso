@@ -1,7 +1,7 @@
 {
   "name": "vaso",
-  "version": "0.0.1",
-  "description": "",
+  "version": "0.1.0",
+  "description": "Glass effect for React",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -9,8 +9,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "bunchee",
-    "prepublishOnly": "rm -rf dist"
+    "build": "rm -rf dist && bunchee",
+    "prepublishOnly": "pnpm build"
   },
   "author": "huozhi",
   "license": "MIT",
