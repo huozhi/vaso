@@ -1,10 +1,11 @@
 'use client'
 
 import { Vaso } from "../../src"
+import { HoverCodeGlass } from "../components/hover-vaso"
 
-function CodeGlass({ children }: { children: React.ReactNode }) {
+function CodeGlass({ children, ...props }: { children: React.ReactNode } & React.ComponentProps<typeof Vaso>) {
   return (
-    <Vaso component="span" px={2} py={0} borderRadius={3} scale={10} blur={0} contrast={1.1}>
+    <Vaso component="span" px={2} py={0} borderRadius={3} scale={10} blur={0} contrast={1.1} {...props}>
       {children}
     </Vaso>
   )
@@ -24,7 +25,7 @@ export default function DocsPage() {
               El Vaso
             </h1>
             <p className="text-lg text-gray-600">
-              A beautiful liquid glass distortion effect component for React
+              Liquid Glass Effect for React
             </p>
           </header>
 
@@ -32,20 +33,12 @@ export default function DocsPage() {
             <section className="border-b border-gray-400 pb-4">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Installation</h2>
               <p className="text-gray-700 mb-4">
-                Install Vaso using your preferred package manager. You can use{" "}
-                <br />
-                <CodeGlass>
-                  <code className="bg-gray-100 px-2 py-1 text-sm text-black">
+                Install Vaso using your preferred package manager. You can install it with{" "}
+                <HoverCodeGlass blurAmount={4}>
+                  <code className="px-2 py-1 text-sm text-black">
                     npm install vaso
                   </code>
-                </CodeGlass>{" "}
-                or{" "}
-                <CodeGlass>
-                  <code className="bg-gray-100 px-2 py-1 text-sm text-black">
-                    pnpm add vaso
-                  </code>
-                </CodeGlass>{" "}
-                depending on your setup.
+                </HoverCodeGlass>{" "}
               </p>
             </section>
 
@@ -126,7 +119,6 @@ export default function DocsPage() {
             </section>
 
             <section>
-              {/* footer info: author huozhi, license MIT, only glass on huozhi text */}
               <p className="text-gray-700">
               author:{" "}
                 <CodeGlass>
