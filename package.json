@@ -2,7 +2,16 @@
   "name": "vaso",
   "version": "0.0.1",
   "description": "",
-  "scripts": {},
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "bunchee",
+    "prepublishOnly": "rm -rf dist"
+  },
   "author": "huozhi",
   "license": "MIT",
   "packageManager": "pnpm@9.15.9",
@@ -15,6 +24,7 @@
     "@types/node": "24.0.7",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
+    "bunchee": "^6.5.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.525.0",
@@ -25,7 +35,6 @@
     "tailwindcss": "^4.1.11"
   },
   "peerDependencies": {
-    "react": "^18 || ^19",
-    "react-dom": "^18 || ^19"
+    "react": "^18 || ^19"
   }
 }
