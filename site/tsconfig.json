@@ -31,7 +31,7 @@
     ".next/types/**/*.ts",
     "**/*.ts",
     "**/*.tsx"
-  ],
+, "app/draggable/page.tsx"  ],
   "exclude": [
     "node_modules"
   ]

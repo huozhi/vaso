@@ -3,6 +3,7 @@
 import React, { cloneElement, useEffect, useId, useRef, useState, useCallback } from 'react'
 
 type VasoProps = {
+  component?: string | React.ComponentType<any>
   children: React.ReactNode
   width?: number
   height?: number
@@ -170,6 +171,7 @@ const generateDisplacementData = (() => {
 })()
 
 const Vaso: React.FC<VasoProps> = ({
+  component: WrapComponent = 'div',
   children,
   width,
   height,
@@ -190,7 +192,7 @@ const Vaso: React.FC<VasoProps> = ({
   onPositionChange,
   onSelect,
 }) => {
-  const idRef = useId()
+  const uid = useId()
   const wrapperRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -307,7 +309,7 @@ const Vaso: React.FC<VasoProps> = ({
           feDisplacementMap.parentElement?.setAttribute('width', `${finalWidth}`)
           feDisplacementMap.parentElement?.setAttribute('height', `${finalHeight}`)
 
-          container.style.backdropFilter = `url(#${idRef}_filter) blur(${blur}px) contrast(${contrast}) brightness(${brightness}) saturate(${saturation})`
+          container.style.backdropFilter = `url(#${uid}_filter) blur(${blur}px) contrast(${contrast}) brightness(${brightness}) saturate(${saturation})`
         }
       } catch (error) {
         console.error('Error updating liquid glass effect:', error)
@@ -329,7 +331,7 @@ const Vaso: React.FC<VasoProps> = ({
     shapeHeight,
     position,
     draggable,
-    idRef,
+    uid,
   ])
 
   // Update position when initialPosition changes (but don't cause infinite loops)
@@ -474,30 +476,28 @@ const Vaso: React.FC<VasoProps> = ({
     }
   }, [])
 
-  const id = idRef
-
   return (
     <>
-      {!draggable &&
-        cloneElement(React.Children.only(children) as React.ReactElement, {
-          // @ts-expect-error: dynamic ref assignment
-          ref: wrapperRef,
-        })}
-
-      {draggable && (
+      {draggable ? (
         <div ref={wrapperRef} style={{ position: 'absolute', visibility: 'hidden', pointerEvents: 'none' }}>
           {children}
         </div>
+      ) : (
+        cloneElement(React.Children.only(children) as React.ReactElement, {
+          // @ts-expect-error: dynamic ref assignment
+          ref: wrapperRef,
+        })
       )}
 
-      <div
+      <WrapComponent
+        data-vaso-id={uid}
         ref={containerRef}
         onMouseDown={handleMouseDown}
         onTouchStart={handleTouchStart}
         style={{
           position: 'fixed',
           overflow: 'hidden',
-          backdropFilter: `url(#${id}_filter) blur(${blur}px) contrast(${contrast}) brightness(${brightness}) saturate(${saturation})`,
+          backdropFilter: `url(#${uid}_filter) blur(${blur}px) contrast(${contrast}) brightness(${brightness}) saturate(${saturation})`,
           boxShadow: '0 4px 8px rgba(0, 0, 0, 0.25), 0 -10px 25px inset rgba(0, 0, 0, 0.15)',
           zIndex: 999,
           borderRadius: borderRadius || 0,
@@ -509,12 +509,12 @@ const Vaso: React.FC<VasoProps> = ({
 
       <svg width="0" height="0" style={{ position: 'fixed', top: 0, left: 0, zIndex: 9998 }}>
         <defs>
-          <filter id={`${id}_filter`} filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB" x="0" y="0">
-            <feImage ref={feImageRef} id={`${id}_map`} />
+          <filter id={`${uid}_filter`} filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB" x="0" y="0">
+            <feImage ref={feImageRef} id={`${uid}_map`} />
             <feDisplacementMap
               ref={feDisplacementMapRef}
               in="SourceGraphic"
-              in2={`${id}_map`}
+              in2={`${uid}_map`}
               xChannelSelector="R"
               yChannelSelector="G"
             />

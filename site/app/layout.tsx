@@ -7,3 +7,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     </html>
   )
 }
+
+export const metadata = {
+  title: 'El Vaso',
+  description: 'Glass Effect for React',
+}
