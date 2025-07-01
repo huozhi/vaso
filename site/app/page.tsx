@@ -20,6 +20,8 @@ const defaultControls = {
   roundness: 0.6,
   width: 0.3,
   height: 0.2,
+  glassWidth: 200,
+  glassHeight: 150,
 }
 
 type GlassInstance = {
@@ -337,6 +339,34 @@ export default function LiquidGlassDemo() {
                     className="w-full"
                   />
                 </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm text-gray-700">Glass Width</Label>
+                    <span className="text-sm text-gray-500 font-mono">{selectedGlass?.controls.glassWidth}px</span>
+                  </div>
+                  <Slider
+                    value={[selectedGlass?.controls.glassWidth || 200]}
+                    onValueChange={([value]) => updateSelectedGlassControl("glassWidth", value)}
+                    max={400}
+                    min={50}
+                    step={10}
+                    className="w-full"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm text-gray-700">Glass Height</Label>
+                    <span className="text-sm text-gray-500 font-mono">{selectedGlass?.controls.glassHeight}px</span>
+                  </div>
+                  <Slider
+                    value={[selectedGlass?.controls.glassHeight || 150]}
+                    onValueChange={([value]) => updateSelectedGlassControl("glassHeight", value)}
+                    max={400}
+                    min={50}
+                    step={10}
+                    className="w-full"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -452,6 +482,8 @@ export default function LiquidGlassDemo() {
               {glasses.map((glass) => (
                 <Vaso
                   key={glass.id}
+                  width={glass.controls.glassWidth}
+                  height={glass.controls.glassHeight}
                   px={glass.controls.padding}
                   py={glass.controls.padding}
                   borderRadius={glass.controls.borderRadius}
@@ -469,7 +501,7 @@ export default function LiquidGlassDemo() {
                   onPositionChange={(position) => updateGlassPosition(glass.id, position)}
                   onSelect={() => setSelectedGlassId(glass.id)}
                 >
-                  <div className="w-48 h-32 bg-transparent" />
+                  <div className="bg-transparent" />
                 </Vaso>
               ))}
             </div>

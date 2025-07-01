@@ -4,6 +4,8 @@ import React, { cloneElement, useEffect, useId, useRef, useState, useCallback } 
 
 type VasoProps = {
   children: React.ReactNode
+  width?: number
+  height?: number
   px?: number
   py?: number
   borderRadius?: number
@@ -169,6 +171,8 @@ const generateDisplacementData = (() => {
 
 const Vaso: React.FC<VasoProps> = ({
   children,
+  width,
+  height,
   px = 0,
   py = 0,
   borderRadius = 0,
@@ -228,15 +232,15 @@ const Vaso: React.FC<VasoProps> = ({
         return
       }
 
-      // Get dimensions from the target element
+      // Get dimensions from props or the target element
       let rect: DOMRect
       if (draggable) {
         const childElement = targetEl.firstElementChild as HTMLElement
         if (!childElement) return
 
         rect = {
-          width: childElement.offsetWidth || 200,
-          height: childElement.offsetHeight || 200,
+          width: width || childElement.offsetWidth || 200,
+          height: height || childElement.offsetHeight || 200,
           left: 0,
           top: 0,
           right: 0,
@@ -247,27 +251,30 @@ const Vaso: React.FC<VasoProps> = ({
         } as DOMRect
       } else {
         rect = targetEl.getBoundingClientRect()
+        // Override with explicit width/height if provided
+        if (width !== undefined) rect.width = width
+        if (height !== undefined) rect.height = height
       }
 
-      const width = Math.max(1, rect.width + 2 * px)
-      const height = Math.max(1, rect.height + 2 * py)
+      const finalWidth = Math.max(1, rect.width + 2 * px)
+      const finalHeight = Math.max(1, rect.height + 2 * py)
 
       // Position distortion overlay
-      container.style.width = `${width}px`
-      container.style.height = `${height}px`
+      container.style.width = `${finalWidth}px`
+      container.style.height = `${finalHeight}px`
 
       if (draggable) {
-        container.style.left = `${position.x - width / 2}px`
-        container.style.top = `${position.y - height / 2}px`
+        container.style.left = `${position.x - finalWidth / 2}px`
+        container.style.top = `${position.y - finalHeight / 2}px`
       } else {
-        container.style.left = `${rect.left + rect.width / 2 - width / 2}px`
-        container.style.top = `${rect.top + rect.height / 2 - height / 2}px`
+        container.style.left = `${rect.left + rect.width / 2 - finalWidth / 2}px`
+        container.style.top = `${rect.top + rect.height / 2 - finalHeight / 2}px`
       }
 
       // Use lower resolution for better performance
       const canvasDPI = 0.75
-      const canvasWidth = Math.max(1, Math.floor(width * canvasDPI))
-      const canvasHeight = Math.max(1, Math.floor(height * canvasDPI))
+      const canvasWidth = Math.max(1, Math.floor(finalWidth * canvasDPI))
+      const canvasHeight = Math.max(1, Math.floor(finalHeight * canvasDPI))
 
       canvas.width = canvasWidth
       canvas.height = canvasHeight
@@ -291,14 +298,14 @@ const Vaso: React.FC<VasoProps> = ({
           context.putImageData(imageData, 0, 0)
 
           feImage.setAttributeNS('http://www.w3.org/1999/xlink', 'href', canvas.toDataURL())
-          feImage.setAttribute('width', `${width}`)
-          feImage.setAttribute('height', `${height}`)
+          feImage.setAttribute('width', `${finalWidth}`)
+          feImage.setAttribute('height', `${finalHeight}`)
 
           // Use absolute value of scale for the final calculation
           const finalScale = Math.max(0, (maxScale * Math.abs(scale)) / 50 / canvasDPI)
           feDisplacementMap.setAttribute('scale', finalScale.toString())
-          feDisplacementMap.parentElement?.setAttribute('width', `${width}`)
-          feDisplacementMap.parentElement?.setAttribute('height', `${height}`)
+          feDisplacementMap.parentElement?.setAttribute('width', `${finalWidth}`)
+          feDisplacementMap.parentElement?.setAttribute('height', `${finalHeight}`)
 
           container.style.backdropFilter = `url(#${idRef}_filter) blur(${blur}px) contrast(${contrast}) brightness(${brightness}) saturate(${saturation})`
         }
@@ -307,6 +314,8 @@ const Vaso: React.FC<VasoProps> = ({
       }
     }, 8) // Faster updates for smoother movement
   }, [
+    width,
+    height,
     px,
     py,
     scale,

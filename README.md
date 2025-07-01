@@ -43,6 +43,8 @@ function App() {
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `children` | `React.ReactNode` | **required** | The content to render inside the glass (typically a transparent div for sizing) |
+| `width` | `number` | `undefined` | Explicit width of the glass element (overrides child element size) |
+| `height` | `number` | `undefined` | Explicit height of the glass element (overrides child element size) |
 | `px` | `number` | `0` | Horizontal padding around the glass effect |
 | `py` | `number` | `0` | Vertical padding around the glass effect |
 | `borderRadius` | `number` | `0` | Border radius of the glass container |
@@ -82,6 +84,22 @@ Vaso supports negative values for several parameters to create inverted effects:
   blur={0.3}
 >
   <div className="w-40 h-28 bg-transparent" />
+</Vaso>
+```
+
+### Glass with Explicit Dimensions
+
+```tsx
+<Vaso
+  width={300}
+  height={200}
+  px={20}
+  py={20}
+  borderRadius={12}
+  scale={75}
+  blur={0.3}
+>
+  <div className="bg-transparent" />
 </Vaso>
 ```
 
