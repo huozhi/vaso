@@ -17,6 +17,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 }
 
 export const metadata = {
-  title: 'El Vaso',
+  title: 'Vaso',
   description: 'Glass Effect for React',
 }

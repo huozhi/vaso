@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { Vaso, VasoProps } from '../../src'
 import { HoverCodeGlass } from '../components/hover-vaso'
-import { useSpring } from '@react-spring/web'
 import './page.css'
 
 function CodeGlass({ children, ...props }: { children: React.ReactNode } & VasoProps<HTMLSpanElement>) {
@@ -14,7 +13,16 @@ function CodeGlass({ children, ...props }: { children: React.ReactNode } & VasoP
   )
 }
 
-function VasoTitle({ controls, onMouseEnter, onMouseLeave }) {
+function VasoTitle({
+  controls,
+}: {
+  controls: {
+    scale: number
+    blur: number
+    borderRadius: number
+    contrast: number
+  }
+}) {
   return (
     <Vaso
       component="span"
@@ -24,11 +32,7 @@ function VasoTitle({ controls, onMouseEnter, onMouseLeave }) {
       borderRadius={controls.borderRadius}
       scale={controls.scale}
       contrast={controls.contrast}
-      // brightness={1 + controls.brightness * currentFactor}
-      // saturation={controls.saturation * currentFactor}
       blur={controls.blur}
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
     >
       <span>{'Vaso'}</span>
     </Vaso>
@@ -36,14 +40,11 @@ function VasoTitle({ controls, onMouseEnter, onMouseLeave }) {
 }
 
 export default function Page() {
-  const [isHovered, setIsHovered] = useState(false)
   const [controls, setControls] = useState({
     scale: 0,
     blur: 0.5,
     borderRadius: 44,
     contrast: 1,
-    brightness: 0.1,
-    saturation: 1.3,
   })
 
   return (
@@ -57,15 +58,11 @@ export default function Page() {
             <div className="max-w-sm">
               <h1 className="text-[88px] font-bold text-gray-900 mb-12">
                 <span>{'El '}</span>
-                <VasoTitle 
-                  controls={controls}
-                  onMouseEnter={() => setIsHovered(true)}
-                  onMouseLeave={() => setIsHovered(false)}
-                />
+                <VasoTitle controls={controls} />
               </h1>
               <p className="text-lg text-gray-600">Liquid Glass Effect for React</p>
             </div>
-            
+
             {/* Compact Controls */}
             <div className="mt-4 bg-white/40 rounded-lg p-2 max-w-sm self-end">
               {/* <p className="text-sm font-medium text-gray-700 mb-2">Glass Tuning</p> */}
@@ -81,7 +78,7 @@ export default function Page() {
                     max="2.0"
                     step="0.1"
                     value={controls.scale}
-                    onChange={(e) => setControls(prev => ({ ...prev, scale: parseFloat(e.target.value) }))}
+                    onChange={(e) => setControls((prev) => ({ ...prev, scale: parseFloat(e.target.value) }))}
                     className="w-full h-1 custom-range"
                     style={{
                       background: '#9ca3af',
@@ -103,7 +100,7 @@ export default function Page() {
                     max="2.0"
                     step="0.1"
                     value={controls.blur}
-                    onChange={(e) => setControls(prev => ({ ...prev, blur: parseFloat(e.target.value) }))}
+                    onChange={(e) => setControls((prev) => ({ ...prev, blur: parseFloat(e.target.value) }))}
                     className="w-full h-1 custom-range"
                     style={{
                       background: '#9ca3af',
@@ -125,7 +122,7 @@ export default function Page() {
                     max="60"
                     step="2"
                     value={controls.borderRadius}
-                    onChange={(e) => setControls(prev => ({ ...prev, borderRadius: parseInt(e.target.value) }))}
+                    onChange={(e) => setControls((prev) => ({ ...prev, borderRadius: parseInt(e.target.value) }))}
                     className="w-full h-1 custom-range"
                     style={{
                       background: '#9ca3af',
@@ -147,7 +144,7 @@ export default function Page() {
                     max="1.0"
                     step="0.2"
                     value={controls.contrast}
-                    onChange={(e) => setControls(prev => ({ ...prev, contrast: parseFloat(e.target.value) }))}
+                    onChange={(e) => setControls((prev) => ({ ...prev, contrast: parseFloat(e.target.value) }))}
                     className="w-full h-1 custom-range"
                     style={{
                       background: '#9ca3af',
@@ -215,7 +212,7 @@ export default function Page() {
                 <CodeGlass>
                   <code className="px-2 py-1 text-sm text-black">draggable={true}</code>
                 </CodeGlass>{' '}
-                to make the glass moveable by the user.
+                \ to make the glass moveable by the user.
               </p>
             </section>
 
@@ -240,10 +237,11 @@ export default function Page() {
                 <CodeGlass>
                   <span className="text-gray-700 font-bold p-1 rounded-md">huozhi</span>
                 </CodeGlass>
-                {/* dot divider */}
+                {/* github link */}
                 <span className="text-gray-700">{' • '}</span>
-                <span>license:</span>
-                <span className="text-gray-700 font-bold">MIT</span>
+                <a href="https://github.com/huozhi/vaso" className="text-gray-700 font-bold underline">
+                  GitHub
+                </a>
               </p>
             </section>
           </div>

@@ -4,6 +4,7 @@ A beautiful liquid glass distortion effect component for React that creates stun
 
 Vaso is the React version of [shuding](https://github.com/shuding)'s [Liquid Glass](https://github.com/shuding/liquid-glass) implementation.
 
+![image](./site/app/opengraph-image.png)
 
 ## Installation
 
@@ -28,9 +29,7 @@ function App() {
         borderRadius={15}
         scale={1.2}
         blur={0.5}
-      >
-        <div className="w-32 h-32 bg-transparent" />
-      </Vaso>
+      />
     </div>
   )
 }
@@ -72,24 +71,25 @@ Vaso supports negative values for several parameters to create inverted effects:
 
 ## Examples
 
+
 ### Basic Glass Effect
 
 ```tsx
 <Vaso
+  className="w-48 h-36 bg-transparent"
   px={20}
   py={20}
   borderRadius={12}
   scale={1.5}
   blur={0.3}
->
-  <div className="w-40 h-28 bg-transparent" />
-</Vaso>
+/>
 ```
 
 ### Glass with Explicit Dimensions
 
 ```tsx
 <Vaso
+  className="w-48 h-36 bg-transparent"
   width={300}
   height={200}
   px={20}
@@ -97,9 +97,7 @@ Vaso supports negative values for several parameters to create inverted effects:
   borderRadius={12}
   scale={1.5}
   blur={0.3}
->
-  <div className="bg-transparent" />
-</Vaso>
+/>
 ```
 
 ### Draggable Glass with Callbacks
@@ -119,9 +117,7 @@ function DraggableGlass() {
       scale={1.2}
       blur={0.4}
       contrast={1.3}
-    >
-      <div className="w-32 h-32 bg-transparent" />
-    </Vaso>
+    />
   )
 }
 ```
@@ -130,6 +126,7 @@ function DraggableGlass() {
 
 ```tsx
 <Vaso
+  className="w-48 h-36 bg-transparent"
   px={30}
   py={30}
   scale={2.0}
@@ -141,58 +138,10 @@ function DraggableGlass() {
   contrast={1.5}
   brightness={1.1}
   saturation={1.2}
->
-  <div className="w-48 h-36 bg-transparent" />
-</Vaso>
-```
-
-### Compression Effect (Negative Scale)
-
-```tsx
-<Vaso
-  px={25}
-  py={25}
-  scale={-0.6}
-  distortionIntensity={0.2}
-  blur={0.2}
-  borderRadius={16}
->
-  <div className="w-40 h-40 bg-transparent" />
-</Vaso>
-```
-
-### Multiple Glass Instances
-
-```tsx
-function MultipleGlasses() {
-  const [glasses, setGlasses] = useState([
-    { id: 1, position: { x: 200, y: 150 }, scale: 1.0 },
-    { id: 2, position: { x: 400, y: 200 }, scale: 1.6 },
-  ])
-  
-  return (
-    <div>
-      {glasses.map((glass) => (
-        <Vaso
-          key={glass.id}
-          draggable
-          initialPosition={glass.position}
-          scale={glass.scale}
-          onPositionChange={(pos) => {
-            setGlasses(prev => prev.map(g => 
-              g.id === glass.id ? { ...g, position: pos } : g
-            ))
-          }}
-        >
-          <div className="w-36 h-24 bg-transparent" />
-        </Vaso>
-      ))}
-    </div>
-  )
-}
+/>
 ```
 
 ## License
 
-MIT © [huozhi](https://github.com/huozhi)
+MIT
 
