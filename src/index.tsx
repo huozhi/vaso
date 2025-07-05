@@ -455,12 +455,12 @@ const Vaso: React.FC<VasoProps> = ({
       const handleScrollOrResize = () => {
         debouncedUpdateEffect()
       }
-      window.addEventListener('scroll', handleScrollOrResize, true)
-      window.addEventListener('resize', handleScrollOrResize)
+      window.addEventListener('scroll', handleScrollOrResize, { passive: true })
+      window.addEventListener('resize', handleScrollOrResize, { passive: true })
 
       return () => {
         observer.disconnect()
-        window.removeEventListener('scroll', handleScrollOrResize, true)
+        window.removeEventListener('scroll', handleScrollOrResize)
         window.removeEventListener('resize', handleScrollOrResize)
       }
     }
