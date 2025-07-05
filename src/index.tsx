@@ -2,26 +2,112 @@
 
 import React, { cloneElement, useEffect, useId, useRef, useState, useCallback } from 'react'
 
-type VasoProps = {
-  component?: string | React.ComponentType<any>
+
+export type VasoProps<Element extends HTMLElement = HTMLDivElement> = React.HTMLAttributes<Element> & {
+  /** The HTML element or React component to render as the glass container
+   * @default 'div'
+   */
+    component?: string | React.ComponentType<React.HTMLAttributes<Element>>
+  
+  /** The content to be rendered inside the glass effect (required) */
   children: React.ReactNode
+  
+  /** Explicit width of the glass element in pixels
+   * @default auto-calculated from content
+   */
   width?: number
+  
+  /** Explicit height of the glass element in pixels
+   * @default auto-calculated from content
+   */
   height?: number
+  
+  /** Horizontal padding around the glass effect in pixels
+   * @default 0
+   * @range 0-100
+   */
   px?: number
+  
+  /** Vertical padding around the glass effect in pixels
+   * @default 0
+   * @range 0-100
+   */
   py?: number
+  
+  /** Border radius of the glass container in pixels
+   * @default 0
+   * @range 0-Infinity
+   */
   borderRadius?: number
+  
+  /** Scale factor for the distortion effect. Negative values create compression
+   * @default 1.0
+   * @range -2.0 to 2.0
+   */
   scale?: number
+  
+  /** Blur amount applied to the backdrop filter in pixels
+   * @default 0.25
+   * @range 0-10
+   */
   blur?: number
+  
+  /** Contrast level for the backdrop filter
+   * @default 1.2
+   * @range 0.5-3.0
+   */
   contrast?: number
+  
+  /** Brightness level for the backdrop filter
+   * @default 1.05
+   * @range 0.5-2.0
+   */
   brightness?: number
+  
+  /** Saturation level for the backdrop filter
+   * @default 1.1
+   * @range 0-2.0
+   */
   saturation?: number
+  
+  /** Intensity of the liquid distortion effect. Negative values invert the effect
+   * @default 0.15
+   * @range -1.0 to 1.0
+   */
   distortionIntensity?: number
+  
+  /** Roundness of the distortion shape. Negative values invert the roundness
+   * @default 0.6
+   * @range -1.0 to 1.0
+   */
   roundness?: number
+  
+  /** Width of the distortion shape relative to container. Negative values invert horizontally
+   * @default 0.3
+   * @range -1.0 to 1.0
+   */
   shapeWidth?: number
+  
+  /** Height of the distortion shape relative to container. Negative values invert vertically
+   * @default 0.2
+   * @range -1.0 to 1.0
+   */
   shapeHeight?: number
+  
+  /** Makes the glass element draggable with mouse/touch
+   * @default false
+   */
   draggable?: boolean
+  
+  /** Initial position when draggable is enabled
+   * @default { x: 300, y: 200 }
+   */
   initialPosition?: { x: number; y: number }
+  
+  /** Callback fired when the glass position changes (only when draggable) */
   onPositionChange?: (position: { x: number; y: number }) => void
+  
+  /** Callback fired when the glass is selected/clicked (only when draggable) */
   onSelect?: () => void
 }
 
@@ -109,7 +195,7 @@ const generateDisplacementData = (() => {
     roundness = 0.6,
     shapeWidth = 0.3,
     shapeHeight = 0.2,
-    scale = 50
+    scale = 1.0
   ) => {
     // Create cache key including all parameters
     const key = `${width}-${height}-${intensity}-${roundness}-${shapeWidth}-${shapeHeight}-${scale}`
@@ -170,32 +256,34 @@ const generateDisplacementData = (() => {
   }
 })()
 
-const Vaso: React.FC<VasoProps> = ({
-  component: WrapComponent = 'div',
-  children,
-  width,
-  height,
-  px = 0,
-  py = 0,
-  borderRadius = 0,
-  scale = 50,
-  blur = 0.25,
-  contrast = 1.2,
-  brightness = 1.05,
-  saturation = 1.1,
-  distortionIntensity = 0.15,
-  roundness = 0.6,
-  shapeWidth = 0.3,
-  shapeHeight = 0.2,
-  draggable = false,
-  initialPosition = { x: 300, y: 200 },
-  onPositionChange,
-  onSelect,
-}) => {
+const Vaso: React.FC<VasoProps> = (props) => {
+  const {
+    component: WrapComponent = 'div',
+    children,
+    width,
+    height,
+    px = 0,
+    py = 0,
+    borderRadius = 0,
+    scale = 1.0,
+    blur = 0.25,
+    contrast = 1.2,
+    brightness = 1.05,
+    saturation = 1.1,
+    distortionIntensity = 0.15,
+    roundness = 0.6,
+    shapeWidth = 0.3,
+    shapeHeight = 0.2,
+    draggable = false,
+    initialPosition = { x: 300, y: 200 },
+    onPositionChange,
+    onSelect,
+    ...htmlProps
+  } = props
   const uid = useId()
   const wrapperRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
+  const containerRef = useRef<HTMLElement>(null)
   const feImageRef = useRef<SVGFEImageElement>(null)
   const feDisplacementMapRef = useRef<SVGFEDisplacementMapElement>(null)
   const updateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -304,7 +392,7 @@ const Vaso: React.FC<VasoProps> = ({
           feImage.setAttribute('height', `${finalHeight}`)
 
           // Use absolute value of scale for the final calculation
-          const finalScale = Math.max(0, (maxScale * Math.abs(scale)) / 50 / canvasDPI)
+          const finalScale = Math.max(0, (maxScale * Math.abs(scale)) / canvasDPI)
           feDisplacementMap.setAttribute('scale', finalScale.toString())
           feDisplacementMap.parentElement?.setAttribute('width', `${finalWidth}`)
           feDisplacementMap.parentElement?.setAttribute('height', `${finalHeight}`)
@@ -490,7 +578,9 @@ const Vaso: React.FC<VasoProps> = ({
       )}
 
       <WrapComponent
+        {...htmlProps}
         data-vaso-id={uid}
+        // @ts-expect-error: dynamic ref assignment, improve this ref type later
         ref={containerRef}
         onMouseDown={handleMouseDown}
         onTouchStart={handleTouchStart}

@@ -17,24 +17,21 @@ export function HoverCodeGlass({
   const [isHovered, setIsHovered] = useState(false)
 
   return (
-    <div
+    <Vaso
+      component='span'
       className="inline-block cursor-pointer"
-      style={{ pointerEvents: 'auto' }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      style={{ pointerEvents: 'auto' }}
+      px={2}
+      py={4}
+      borderRadius={6}
+      scale={20}
+      blur={isHovered ? 0 : blurAmount}
+      contrast={1.1}
+      {...props}
     >
-      <Vaso
-        component="span"
-        px={2}
-        py={4}
-        borderRadius={6}
-        scale={20}
-        blur={isHovered ? 0 : blurAmount}
-        contrast={1.1}
-        {...props}
-      >
-        {children}
-      </Vaso>
-    </div>
+      {children}
+    </Vaso>
   )
 } 

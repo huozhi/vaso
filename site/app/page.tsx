@@ -1,11 +1,11 @@
 'use client'
 
-import { Vaso } from "../../src"
+import { Vaso, VasoProps } from "../../src"
 import { HoverCodeGlass } from "../components/hover-vaso"
 
-function CodeGlass({ children, ...props }: { children: React.ReactNode } & React.ComponentProps<typeof Vaso>) {
+function CodeGlass({ children, ...props }: { children: React.ReactNode } & VasoProps<HTMLSpanElement>) {
   return (
-    <Vaso component="span" px={2} py={0} borderRadius={3} scale={10} blur={0} contrast={1.1} {...props}>
+    <Vaso component="span" px={2} py={0} borderRadius={3} blur={0} contrast={1.1} {...props}>
       {children}
     </Vaso>
   )
