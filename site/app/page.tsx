@@ -34,7 +34,7 @@ export default function DocsPage() {
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Installation</h2>
               <p className="text-gray-700 mb-4">
                 Install Vaso using your preferred package manager. You can install it with{" "}
-                <HoverCodeGlass blurAmount={4}>
+                <HoverCodeGlass>
                   <code className="px-2 py-1 text-sm text-black">
                     npm install vaso
                   </code>

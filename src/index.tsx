@@ -7,7 +7,7 @@ export type VasoProps<Element extends HTMLElement = HTMLDivElement> = React.HTML
   /** The HTML element or React component to render as the glass container
    * @default 'div'
    */
-    component?: string | React.ComponentType<React.HTMLAttributes<Element>>
+  component?: string | React.ComponentType<React.HTMLAttributes<Element>>
   
   /** The content to be rendered inside the glass effect (required) */
   children: React.ReactNode
@@ -106,9 +106,6 @@ export type VasoProps<Element extends HTMLElement = HTMLDivElement> = React.HTML
   
   /** Callback fired when the glass position changes (only when draggable) */
   onPositionChange?: (position: { x: number; y: number }) => void
-  
-  /** Callback fired when the glass is selected/clicked (only when draggable) */
-  onSelect?: () => void
 }
 
 // Smooth interpolation (used for fade effects near the edge)
@@ -256,30 +253,28 @@ const generateDisplacementData = (() => {
   }
 })()
 
-const Vaso: React.FC<VasoProps> = (props) => {
-  const {
-    component: WrapComponent = 'div',
-    children,
-    width,
-    height,
-    px = 0,
-    py = 0,
-    borderRadius = 0,
-    scale = 1.0,
-    blur = 0.25,
-    contrast = 1.2,
-    brightness = 1.05,
-    saturation = 1.1,
-    distortionIntensity = 0.15,
-    roundness = 0.6,
-    shapeWidth = 0.3,
-    shapeHeight = 0.2,
-    draggable = false,
-    initialPosition = { x: 300, y: 200 },
-    onPositionChange,
-    onSelect,
-    ...htmlProps
-  } = props
+const Vaso: React.FC<VasoProps> = ({
+  component: WrapComponent = 'div',
+  children,
+  width,
+  height,
+  px = 0,
+  py = 0,
+  borderRadius = 0,
+  scale = 1.0,
+  blur = 0.25,
+  contrast = 1.2,
+  brightness = 1.05,
+  saturation = 1.1,
+  distortionIntensity = 0.15,
+  roundness = 0.6,
+  shapeWidth = 0.3,
+  shapeHeight = 0.2,
+  draggable = false,
+  initialPosition = { x: 300, y: 200 },
+  onPositionChange,
+  ...htmlProps
+}) => {
   const uid = useId()
   const wrapperRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -470,8 +465,8 @@ const Vaso: React.FC<VasoProps> = (props) => {
     (e: React.MouseEvent) => {
       if (!draggable) return
 
-      // Select this glass when clicked
-      onSelect?.()
+      // @ts-expect-error: dynamic ref assignment, improve this ref type later
+      htmlProps.onMouseDown?.(e)
 
       setIsDragging(true)
       setDragOffset({
@@ -479,7 +474,7 @@ const Vaso: React.FC<VasoProps> = (props) => {
         y: e.clientY - position.y,
       })
     },
-    [draggable, position, onSelect]
+    [draggable, position, htmlProps]
   )
 
   const handleMouseMove = useCallback(
@@ -503,8 +498,9 @@ const Vaso: React.FC<VasoProps> = (props) => {
   const handleTouchStart = useCallback(
     (e: React.TouchEvent) => {
       if (!draggable) return
-
-      onSelect?.()
+      
+      // @ts-expect-error: dynamic ref assignment, improve this ref type later
+      htmlProps.onTouchStart?.(e)
 
       const touch = e.touches[0]
       setIsDragging(true)
@@ -513,7 +509,7 @@ const Vaso: React.FC<VasoProps> = (props) => {
         y: touch.clientY - position.y,
       })
     },
-    [draggable, position, onSelect]
+    [draggable, position, htmlProps]
   )
 
   const handleTouchMove = useCallback(
