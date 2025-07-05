@@ -5,7 +5,7 @@ import { HoverCodeGlass } from "../components/hover-vaso"
 
 function CodeGlass({ children, ...props }: { children: React.ReactNode } & VasoProps<HTMLSpanElement>) {
   return (
-    <Vaso component="span" px={2} py={0} borderRadius={3} blur={0} contrast={1.1} {...props}>
+    <Vaso component="span" px={2} py={0} borderRadius={3} blur={0.25} contrast={1.1} {...props}>
       {children}
     </Vaso>
   )

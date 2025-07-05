@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useSpring } from '@react-spring/web'
 import { Vaso } from "../../src"
 
 interface HoverCodeGlassProps {
@@ -15,6 +16,14 @@ export function HoverCodeGlass({
   ...props 
 }: HoverCodeGlassProps) {
   const [isHovered, setIsHovered] = useState(false)
+  const springs = useSpring({
+    blur: isHovered ? 0 : blurAmount,
+    config: {
+      tension: 120,
+      friction: 14,
+    },
+  })
+  const blur = springs.blur.to(val => val).get()
 
   return (
     <Vaso
@@ -25,10 +34,9 @@ export function HoverCodeGlass({
       style={{ pointerEvents: 'auto' }}
       px={2}
       py={4}
+      scale={0}
       borderRadius={6}
-      scale={20}
-      blur={isHovered ? 0 : blurAmount}
-      contrast={1.1}
+      blur={blur}
       {...props}
     >
       {children}
