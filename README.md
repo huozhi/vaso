@@ -2,7 +2,7 @@
 
 A beautiful liquid glass distortion effect component for React that creates stunning visual magnification and warping effects.
 
-Vaso is the React version of this [Liquid Glass](https://github.com/shuding/liquid-glass) implementation.
+Vaso is the React version of [shuding](https://github.com/shuding)'s [Liquid Glass](https://github.com/shuding/liquid-glass) implementation.
 
 
 ## Installation
@@ -26,7 +26,7 @@ function App() {
         px={20}
         py={20}
         borderRadius={15}
-        scale={50}
+        scale={1.2}
         blur={0.5}
       >
         <div className="w-32 h-32 bg-transparent" />
@@ -40,36 +40,35 @@ function App() {
 
 ### Props
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `children` | `React.ReactNode` | **required** | The content to render inside the glass (typically a transparent div for sizing) |
-| `width` | `number` | `undefined` | Explicit width of the glass element (overrides child element size) |
-| `height` | `number` | `undefined` | Explicit height of the glass element (overrides child element size) |
-| `px` | `number` | `0` | Horizontal padding around the glass effect |
-| `py` | `number` | `0` | Vertical padding around the glass effect |
-| `borderRadius` | `number` | `0` | Border radius of the glass container |
-| `scale` | `number` | `50` | Distortion scale intensity (supports negative values for compression) |
-| `blur` | `number` | `0.25` | Blur amount applied to the background |
-| `contrast` | `number` | `1.2` | Contrast adjustment (1 = normal, >1 = more contrast) |
-| `brightness` | `number` | `1.05` | Brightness adjustment (1 = normal, >1 = brighter) |
-| `saturation` | `number` | `1.1` | Saturation adjustment (1 = normal, >1 = more saturated) |
-| `distortionIntensity` | `number` | `0.15` | Intensity of the distortion effect (supports negative values) |
-| `roundness` | `number` | `0.6` | Roundness of the distortion shape (supports negative values) |
-| `shapeWidth` | `number` | `0.3` | Width of the distortion shape (supports negative values) |
-| `shapeHeight` | `number` | `0.2` | Height of the distortion shape (supports negative values) |
-| `draggable` | `boolean` | `false` | Whether the glass can be dragged around |
-| `initialPosition` | `{ x: number; y: number }` | `{ x: 300, y: 200 }` | Initial position for draggable glass |
-| `onPositionChange` | `(position: { x: number; y: number }) => void` | `undefined` | Callback when glass position changes |
-| `onSelect` | `() => void` | `undefined` | Callback when glass is selected/clicked |
+| Prop | Type | Default | Range | Description |
+|------|------|---------|-------|-------------|
+| `children` | `React.ReactNode` | **required** | - | The content to render inside the glass (typically a transparent div for sizing) |
+| `width` | `number` | `undefined` | - | Explicit width of the glass element (overrides child element size) |
+| `height` | `number` | `undefined` | - | Explicit height of the glass element (overrides child element size) |
+| `px` | `number` | `0` | `0-100` | Horizontal padding around the glass effect |
+| `py` | `number` | `0` | `0-100` | Vertical padding around the glass effect |
+| `borderRadius` | `number` | `0` | `0-∞` | Border radius of the glass container |
+| `scale` | `number` | `1.0` | `-2.0 to 2.0` | Distortion scale intensity (negative values create compression) |
+| `blur` | `number` | `0.25` | `0-10` | Blur amount applied to the background |
+| `contrast` | `number` | `1` | `0-1.0` | Contrast adjustment (1 = normal, >1 = more contrast) |
+| `brightness` | `number` | `1.0` | `0-2.0` | Brightness adjustment (1 = normal, >1 = brighter) |
+| `saturation` | `number` | `1.0` | `0-2.0` | Saturation adjustment (1 = normal, >1 = more saturated) |
+| `distortionIntensity` | `number` | `0.15` | `-1.0 to 1.0` | Intensity of the distortion effect (negative values invert effect) |
+| `roundness` | `number` | `0.6` | `-1.0 to 1.0` | Roundness of the distortion shape (negative values invert roundness) |
+| `shapeWidth` | `number` | `0.3` | `-1.0 to 1.0` | Width of the distortion shape (negative values invert horizontally) |
+| `shapeHeight` | `number` | `0.2` | `-1.0 to 1.0` | Height of the distortion shape (negative values invert vertically) |
+| `draggable` | `boolean` | `false` | - | Whether the glass can be dragged around |
+| `initialPosition` | `{ x: number; y: number }` | `{ x: 300, y: 200 }` | - | Initial position for draggable glass |
+| `onPositionChange` | `(position: { x: number; y: number }) => void` | `undefined` | - | Callback when glass position changes |
 
 ### Negative Values Support
 
 Vaso supports negative values for several parameters to create inverted effects:
 
-- **`scale`**: Negative values create compression instead of magnification
-- **`distortionIntensity`**: Negative values invert the distortion direction
-- **`roundness`**: Negative values create inverted roundness effects
-- **`shapeWidth`/`shapeHeight`**: Negative values flip the aspect ratio effects
+- **`scale`** (`-2.0 to 2.0`): Negative values create compression instead of magnification
+- **`distortionIntensity`** (`-1.0 to 1.0`): Negative values invert the distortion direction
+- **`roundness`** (`-1.0 to 1.0`): Negative values create inverted roundness effects
+- **`shapeWidth`/`shapeHeight`** (`-1.0 to 1.0`): Negative values flip the distortion horizontally/vertically
 
 ## Examples
 
@@ -80,7 +79,7 @@ Vaso supports negative values for several parameters to create inverted effects:
   px={20}
   py={20}
   borderRadius={12}
-  scale={75}
+  scale={1.5}
   blur={0.3}
 >
   <div className="w-40 h-28 bg-transparent" />
@@ -96,7 +95,7 @@ Vaso supports negative values for several parameters to create inverted effects:
   px={20}
   py={20}
   borderRadius={12}
-  scale={75}
+  scale={1.5}
   blur={0.3}
 >
   <div className="bg-transparent" />
@@ -114,11 +113,10 @@ function DraggableGlass() {
       draggable
       initialPosition={position}
       onPositionChange={setPosition}
-      onSelect={() => console.log('Glass selected!')}
       px={15}
       py={15}
       borderRadius={20}
-      scale={60}
+      scale={1.2}
       blur={0.4}
       contrast={1.3}
     >
@@ -134,7 +132,7 @@ function DraggableGlass() {
 <Vaso
   px={30}
   py={30}
-  scale={120}
+  scale={2.0}
   distortionIntensity={0.35}
   roundness={0.8}
   shapeWidth={0.4}
@@ -154,7 +152,7 @@ function DraggableGlass() {
 <Vaso
   px={25}
   py={25}
-  scale={-30}
+  scale={-0.6}
   distortionIntensity={0.2}
   blur={0.2}
   borderRadius={16}
@@ -168,8 +166,8 @@ function DraggableGlass() {
 ```tsx
 function MultipleGlasses() {
   const [glasses, setGlasses] = useState([
-    { id: 1, position: { x: 200, y: 150 }, scale: 50 },
-    { id: 2, position: { x: 400, y: 200 }, scale: 80 },
+    { id: 1, position: { x: 200, y: 150 }, scale: 1.0 },
+    { id: 2, position: { x: 400, y: 200 }, scale: 1.6 },
   ])
   
   return (

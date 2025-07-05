@@ -13,7 +13,7 @@ export function HoverCodeGlass({
 }: HoverCodeGlassProps) {
   const [isHovered, setIsHovered] = useState(false)
   const [currentBlur, setCurrentBlur] = useState(4)
-  
+
   useSpring({
     blur: isHovered ? 0 : 4,
     config: {

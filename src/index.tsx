@@ -41,7 +41,7 @@ export type VasoProps<Element extends HTMLElement = HTMLDivElement> = React.HTML
   borderRadius?: number
   
   /** Scale factor for the distortion effect. Negative values create compression
-   * @default 1.0
+   * @default 0
    * @range -2.0 to 2.0
    */
   scale?: number
@@ -53,19 +53,19 @@ export type VasoProps<Element extends HTMLElement = HTMLDivElement> = React.HTML
   blur?: number
   
   /** Contrast level for the backdrop filter
-   * @default 1.2
-   * @range 0.5-3.0
+   * @default 1
+   * @range 0-1.0
    */
   contrast?: number
   
   /** Brightness level for the backdrop filter
-   * @default 1.05
-   * @range 0.5-2.0
+   * @default 1.0
+   * @range 0-2.0
    */
   brightness?: number
   
   /** Saturation level for the backdrop filter
-   * @default 1.1
+   * @default 1.0
    * @range 0-2.0
    */
   saturation?: number
@@ -103,6 +103,11 @@ export type VasoProps<Element extends HTMLElement = HTMLDivElement> = React.HTML
    * @default { x: 300, y: 200 }
    */
   initialPosition?: { x: number; y: number }
+
+  /** Duration of the position change animation in milliseconds
+   * @default 16
+   */
+  positioningDuration?: number
   
   /** Callback fired when the glass position changes (only when draggable) */
   onPositionChange?: (position: { x: number; y: number }) => void
@@ -141,7 +146,7 @@ function createDisplacementFragment(
   roundness = 0.6,
   shapeWidth = 0.3,
   shapeHeight = 0.2,
-  scale = 50
+  scale = 0
 ) {
   const ix = uv.x - 0.5
   const iy = uv.y - 0.5
@@ -261,17 +266,18 @@ const Vaso: React.FC<VasoProps> = ({
   px = 0,
   py = 0,
   borderRadius = 0,
-  scale = 1.0,
+  scale = 0,
   blur = 0.25,
-  contrast = 1.2,
-  brightness = 1.05,
-  saturation = 1.1,
+  contrast = 1,
+  brightness = 1.0,
+  saturation = 1.0,
   distortionIntensity = 0.15,
   roundness = 0.6,
   shapeWidth = 0.3,
   shapeHeight = 0.2,
   draggable = false,
   initialPosition = { x: 300, y: 200 },
+  positioningDuration = 0,
   onPositionChange,
   ...htmlProps
 }) => {
@@ -395,9 +401,9 @@ const Vaso: React.FC<VasoProps> = ({
           container.style.backdropFilter = `url(#${uid}_filter) blur(${blur}px) contrast(${contrast}) brightness(${brightness}) saturate(${saturation})`
         }
       } catch (error) {
-        console.error('Error updating liquid glass effect:', error)
+        console.error(error)
       }
-    }, 8) // Faster updates for smoother movement
+    }, 0)
   }, [
     width,
     height,
@@ -429,7 +435,7 @@ const Vaso: React.FC<VasoProps> = ({
     if (onPositionChange && (position.x !== initialPosition.x || position.y !== initialPosition.y)) {
       const timeoutId = setTimeout(() => {
         onPositionChange(position)
-      }, 16) // Faster position updates
+      }, positioningDuration) // Faster position updates
       return () => clearTimeout(timeoutId)
     }
   }, [position, onPositionChange]) // Don't include initialPosition to prevent loops
