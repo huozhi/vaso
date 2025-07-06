@@ -112,6 +112,9 @@ export type VasoProps<Element extends HTMLElement = HTMLDivElement> = React.HTML
    * @default 16
    */
   positioningDuration?: number
+
+  /** Box shadow for the glass element */
+  boxShadow?: string
   
   /** Callback fired when the glass position changes (only when draggable) */
   onPositionChange?: (position: { x: number; y: number }) => void
@@ -282,6 +285,7 @@ const Vaso: React.FC<VasoProps> = ({
   draggable = false,
   initialPosition = { x: 300, y: 200 },
   positioningDuration = 0,
+  boxShadow,
   onPositionChange,
   ...htmlProps
 }) => {
@@ -309,6 +313,7 @@ const Vaso: React.FC<VasoProps> = ({
       setPosition(newPosition)
     })
   }, [])
+
 
   // Optimized update function with requestAnimationFrame
   const updateEffectRef = useRef<number | null>(null)
@@ -363,7 +368,22 @@ const Vaso: React.FC<VasoProps> = ({
         container.style.left = `${position.x - finalWidth / 2}px`
         container.style.top = `${position.y - finalHeight / 2}px`
       }
-      // For non-draggable elements, sizing is handled by CSS
+
+      if (!boxShadow) {
+        // Calculate shadow based on dimensions
+        const shadowWidth = finalWidth
+        const shadowHeight = finalHeight
+        const shadowScale = Math.min(Math.max(shadowWidth + shadowHeight, 100), 800) / 400
+        
+        const blurRadius = Math.round(4 * shadowScale)
+        const spreadRadius = Math.round(8 * shadowScale)
+        const insetBlur = Math.round(20 * shadowScale)
+        const insetOffset = Math.round(-10 * shadowScale)
+        
+        boxShadow = `0 ${blurRadius}px ${spreadRadius}px rgba(0, 0, 0, 0.25), 0 ${insetOffset}px ${insetBlur}px inset rgba(0, 0, 0, 0.15)`
+      }
+
+      container.style.boxShadow = boxShadow
 
       // Use lower resolution for better performance
       const canvasDPI = 0.75
@@ -569,7 +589,7 @@ const Vaso: React.FC<VasoProps> = ({
   }, [])
 
   return (
-    <WrapComponent style={{ position: 'relative', display: 'inline-block' }}>
+    <WrapComponent {...htmlProps} style={{ position: 'relative', display: 'inline-block' }}>
       {!draggable && (
         cloneElement(React.Children.only(children) as React.ReactElement, {
           // @ts-expect-error: dynamic ref assignment
@@ -584,7 +604,6 @@ const Vaso: React.FC<VasoProps> = ({
       )}
 
       <WrapComponent
-        {...htmlProps}
         data-vaso-id={uid}
         // @ts-expect-error: dynamic ref assignment, improve this ref type later
         ref={containerRef}
@@ -598,13 +617,13 @@ const Vaso: React.FC<VasoProps> = ({
           height: draggable ? height : `calc(100% + ${py * 2}px)`,
           overflow: 'hidden',
           backdropFilter: `url(#${uid}_filter) blur(${blur}px) contrast(${contrast}) brightness(${brightness}) saturate(${saturation})`,
-          boxShadow: '0 4px 8px rgba(0, 0, 0, 0.25), 0 -10px 25px inset rgba(0, 0, 0, 0.15)',
           zIndex: draggable ? 999 : 1,
           borderRadius: borderRadius || 0,
           cursor: draggable ? (isDragging ? 'grabbing' : 'grab') : 'default',
           userSelect: 'none',
           transition: isDragging ? 'none' : 'transform 0.1s ease-out',
           pointerEvents: draggable ? 'auto' : 'none',
+          ...htmlProps.style,
         }}
       />
 

@@ -123,3 +123,11 @@ html, body {
     @apply bg-background text-foreground;
   }
 }
+
+
+section p {
+  line-height: 1.8;
+}
+section p span {
+  line-height: 1.1;
+}

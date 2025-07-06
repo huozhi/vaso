@@ -57,6 +57,7 @@ function App() {
 | `shapeWidth` | `number` | `0.3` | `-1.0 to 1.0` | Width of the distortion shape (negative values invert horizontally) |
 | `shapeHeight` | `number` | `0.2` | `-1.0 to 1.0` | Height of the distortion shape (negative values invert vertically) |
 | `draggable` | `boolean` | `false` | - | Whether the glass can be dragged around |
+| `boxShadow` | `string` | `(auto-calculated)` | - | Box shadow for the glass element |
 | `initialPosition` | `{ x: number; y: number }` | `{ x: 300, y: 200 }` | - | Initial position for draggable glass |
 | `onPositionChange` | `(position: { x: number; y: number }) => void` | `undefined` | - | Callback when glass position changes |
 

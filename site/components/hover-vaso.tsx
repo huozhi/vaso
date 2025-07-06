@@ -33,7 +33,7 @@ export function HoverCodeGlass({
       className="inline-block cursor-pointer"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      style={{ pointerEvents: 'auto' }}
+      style={{ pointerEvents: 'auto', cursor: 'pointer', }}
       px={2}
       py={4}
       scale={0}
