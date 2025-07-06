@@ -2,6 +2,10 @@
 
 import React, { cloneElement, useEffect, useId, useRef, useState, useCallback } from 'react'
 
+const rAF = typeof window !== 'undefined' 
+  ? window.requestAnimationFrame || setTimeout
+  : (() => 0)
+
 
 export type VasoProps<Element extends HTMLElement = HTMLDivElement> = React.HTMLAttributes<Element> & {
   /** The HTML element or React component to render as the glass container
@@ -301,18 +305,20 @@ const Vaso: React.FC<VasoProps> = ({
       cancelAnimationFrame(animationFrameRef.current)
     }
 
-    animationFrameRef.current = requestAnimationFrame(() => {
+    animationFrameRef.current = rAF(() => {
       setPosition(newPosition)
     })
   }, [])
 
-  // Debounced update function for performance
-  const debouncedUpdateEffect = useCallback(() => {
-    if (updateTimeoutRef.current) {
-      clearTimeout(updateTimeoutRef.current)
+  // Optimized update function with requestAnimationFrame
+  const updateEffectRef = useRef<number | null>(null)
+  
+  const scheduleUpdate = useCallback(() => {
+    if (updateEffectRef.current) {
+      cancelAnimationFrame(updateEffectRef.current)
     }
 
-    updateTimeoutRef.current = setTimeout(() => {
+    const reposition = () => {
       const targetEl = wrapperRef.current
       const canvas = canvasRef.current
       const feImage = feImageRef.current
@@ -403,7 +409,9 @@ const Vaso: React.FC<VasoProps> = ({
       } catch (error) {
         console.error(error)
       }
-    }, 0)
+    }
+
+    updateEffectRef.current = rAF(reposition)
   }, [
     width,
     height,
@@ -442,29 +450,35 @@ const Vaso: React.FC<VasoProps> = ({
 
   // Update effect when any prop changes
   useEffect(() => {
-    debouncedUpdateEffect()
-  }, [debouncedUpdateEffect])
+    scheduleUpdate()
+  }, [scheduleUpdate])
 
+  // Throttled scroll/resize handling with rAF
+  const scrollRafRef = useRef<number | null>(null)
+  
   useEffect(() => {
     if (!draggable) {
-      const observer = new ResizeObserver(() => {
-        debouncedUpdateEffect()
-      })
-      if (wrapperRef.current) observer.observe(wrapperRef.current)
-
       const handleScrollOrResize = () => {
-        debouncedUpdateEffect()
+        if (scrollRafRef.current) return // Already scheduled
+        
+        scrollRafRef.current = rAF(() => {
+          scheduleUpdate()
+          scrollRafRef.current = null
+        })
       }
+      
       window.addEventListener('scroll', handleScrollOrResize, { passive: true })
       window.addEventListener('resize', handleScrollOrResize, { passive: true })
 
       return () => {
-        observer.disconnect()
+        if (scrollRafRef.current) {
+          cancelAnimationFrame(scrollRafRef.current)
+        }
         window.removeEventListener('scroll', handleScrollOrResize)
         window.removeEventListener('resize', handleScrollOrResize)
       }
     }
-  }, [debouncedUpdateEffect, draggable])
+  }, [scheduleUpdate, draggable])
 
   // Mouse event handlers for dragging
   const handleMouseDown = useCallback(
@@ -562,6 +576,12 @@ const Vaso: React.FC<VasoProps> = ({
       }
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current)
+      }
+      if (updateEffectRef.current) {
+        cancelAnimationFrame(updateEffectRef.current)
+      }
+      if (scrollRafRef.current) {
+        cancelAnimationFrame(scrollRafRef.current)
       }
     }
   }, [])

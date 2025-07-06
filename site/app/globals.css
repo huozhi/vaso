@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+html, body {
+  overscroll-behavior-y: none;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

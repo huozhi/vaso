@@ -52,7 +52,7 @@ export default function Page() {
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
 
-      <div className="min-h-screen p-8 pt-22 bg-[#e0e5e1]" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+      <div className="min-h-screen p-8 pt-22 bg-[#e0e5e1] pb-32" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
         <div className="max-w-3xl mx-auto">
           <header className="mb-8 flex items-center justify-between">
             <div className="max-w-sm">
