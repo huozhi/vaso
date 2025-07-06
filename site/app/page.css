@@ -27,3 +27,63 @@
   border: 2px solid #6b7280;
   cursor: pointer;
 }
+
+/* Desktop - remove margin-right */
+@media (min-width: 769px) {
+  .mobile-h1-small {
+    margin-right: 0 !important;
+  }
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .mobile-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 1rem !important;
+  }
+  
+  .root {
+    padding: 32px 16px !important;
+  }
+
+  .mobile-title {
+    max-width: 100% !important;
+  }
+  
+  .mobile-h1 {
+    font-size: 3rem !important; /* 48px instead of 88px */
+    margin-bottom: 1rem !important;
+  }
+  
+  .mobile-controls {
+    position: static !important;
+    max-width: 100% !important;
+    margin-top: 0 !important;
+    align-self: stretch !important;
+  }
+  
+  .mobile-controls-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+  
+  .mobile-controls .space-y-1 {
+    margin-bottom: 0.5rem;
+  }
+}
+
+/* Small mobile devices */
+@media (max-width: 480px) {
+  .mobile-h1 {
+    font-size: 2.5rem !important; /* 40px for very small screens */
+  }
+  
+  .mobile-controls {
+    padding: 0.75rem !important;
+  }
+  
+  .mobile-controls-grid {
+    gap: 1rem !important;
+  }
+}

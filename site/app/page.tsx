@@ -52,21 +52,21 @@ export default function Page() {
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
 
-      <div className="min-h-screen p-8 pt-22 bg-[#e0e5e1] pb-32" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+      <div className="min-h-screen p-8 pt-22 bg-[#e0e5e1] pb-32 root" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
         <div className="max-w-3xl mx-auto">
-          <header className="mb-8 flex items-center justify-between">
-            <div className="max-w-sm">
-              <h1 className="text-[88px] font-bold text-gray-900 mb-12">
-                <span>{'El '}</span>
+          <header className="mb-8 flex items-center justify-between mobile-header">
+            <div className="max-w-sm mobile-title">
+              <h1 className="text-[88px] font-bold text-gray-900 mb-12 mobile-h1">
+                <small className="mobile-h1-small font-light mr-8">{'El '}</small>
                 <VasoTitle controls={controls} />
               </h1>
               <p className="text-lg text-gray-600">Liquid Glass Effect for React</p>
             </div>
 
             {/* Compact Controls */}
-            <div className="mt-4 bg-white/40 rounded-lg p-2 max-w-sm self-end">
+            <div className="mt-4 bg-white/40 rounded-lg p-2 max-w-sm self-end mobile-controls">
               {/* <p className="text-sm font-medium text-gray-700 mb-2">Glass Tuning</p> */}
-              <div className="grid grid-cols-2 gap-1 text-xs text-gray-600">
+              <div className="grid grid-cols-2 gap-1 text-xs text-gray-600 mobile-controls-grid">
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
                     <span>Scale</span>

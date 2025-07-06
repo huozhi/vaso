@@ -357,16 +357,13 @@ const Vaso: React.FC<VasoProps> = ({
       const finalHeight = Math.max(1, rect.height + 2 * py)
 
       // Position distortion overlay
-      container.style.width = `${finalWidth}px`
-      container.style.height = `${finalHeight}px`
-
       if (draggable) {
+        container.style.width = `${finalWidth}px`
+        container.style.height = `${finalHeight}px`
         container.style.left = `${position.x - finalWidth / 2}px`
         container.style.top = `${position.y - finalHeight / 2}px`
-      } else {
-        container.style.left = `${rect.left + rect.width / 2 - finalWidth / 2}px`
-        container.style.top = `${rect.top + rect.height / 2 - finalHeight / 2}px`
       }
+      // For non-draggable elements, sizing is handled by CSS
 
       // Use lower resolution for better performance
       const canvasDPI = 0.75
@@ -453,32 +450,17 @@ const Vaso: React.FC<VasoProps> = ({
     scheduleUpdate()
   }, [scheduleUpdate])
 
-  // Throttled scroll/resize handling with rAF
+  // Only draggable elements need scroll/resize handling
   const scrollRafRef = useRef<number | null>(null)
   
   useEffect(() => {
-    if (!draggable) {
-      const handleScrollOrResize = () => {
-        if (scrollRafRef.current) return // Already scheduled
-        
-        scrollRafRef.current = rAF(() => {
-          scheduleUpdate()
-          scrollRafRef.current = null
-        })
-      }
-      
-      window.addEventListener('scroll', handleScrollOrResize, { passive: true })
-      window.addEventListener('resize', handleScrollOrResize, { passive: true })
-
-      return () => {
-        if (scrollRafRef.current) {
-          cancelAnimationFrame(scrollRafRef.current)
-        }
-        window.removeEventListener('scroll', handleScrollOrResize)
-        window.removeEventListener('resize', handleScrollOrResize)
+    // Non-draggable elements use relative positioning and don't need repositioning
+    return () => {
+      if (scrollRafRef.current) {
+        cancelAnimationFrame(scrollRafRef.current)
       }
     }
-  }, [scheduleUpdate, draggable])
+  }, [])
 
   // Mouse event handlers for dragging
   const handleMouseDown = useCallback(
@@ -587,16 +569,18 @@ const Vaso: React.FC<VasoProps> = ({
   }, [])
 
   return (
-    <>
-      {draggable ? (
-        <div ref={wrapperRef} style={{ position: 'absolute', visibility: 'hidden', pointerEvents: 'none' }}>
-          {children}
-        </div>
-      ) : (
+    <WrapComponent style={{ position: 'relative', display: 'inline-block' }}>
+      {!draggable && (
         cloneElement(React.Children.only(children) as React.ReactElement, {
           // @ts-expect-error: dynamic ref assignment
           ref: wrapperRef,
         })
+      )}
+      
+      {draggable && (
+        <div ref={wrapperRef} style={{ position: 'absolute', visibility: 'hidden', pointerEvents: 'none' }}>
+          {children}
+        </div>
       )}
 
       <WrapComponent
@@ -607,15 +591,20 @@ const Vaso: React.FC<VasoProps> = ({
         onMouseDown={handleMouseDown}
         onTouchStart={handleTouchStart}
         style={{
-          position: 'fixed',
+          position: draggable ? 'fixed' : 'absolute',
+          top: draggable ? position.y - (height || 0) / 2 : -py,
+          left: draggable ? position.x - (width || 0) / 2 : -px,
+          width: draggable ? width : `calc(100% + ${px * 2}px)`,
+          height: draggable ? height : `calc(100% + ${py * 2}px)`,
           overflow: 'hidden',
           backdropFilter: `url(#${uid}_filter) blur(${blur}px) contrast(${contrast}) brightness(${brightness}) saturate(${saturation})`,
           boxShadow: '0 4px 8px rgba(0, 0, 0, 0.25), 0 -10px 25px inset rgba(0, 0, 0, 0.15)',
-          zIndex: 999,
+          zIndex: draggable ? 999 : 1,
           borderRadius: borderRadius || 0,
           cursor: draggable ? (isDragging ? 'grabbing' : 'grab') : 'default',
           userSelect: 'none',
           transition: isDragging ? 'none' : 'transform 0.1s ease-out',
+          pointerEvents: draggable ? 'auto' : 'none',
         }}
       />
 
@@ -634,7 +623,7 @@ const Vaso: React.FC<VasoProps> = ({
         </defs>
       </svg>
       <canvas ref={canvasRef} style={{ display: 'none' }} />
-    </>
+    </WrapComponent>
   )
 }
 
