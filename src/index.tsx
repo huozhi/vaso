@@ -47,7 +47,7 @@ export type VasoProps<Element extends HTMLElement = HTMLDivElement> = React.HTML
    * @default 0
    * @range 0-Infinity
    */
-  borderRadius?: number
+  radius?: number
   
   /** Depth factor for the distortion effect. Negative values create compression
    * @default 0
@@ -76,21 +76,6 @@ export type VasoProps<Element extends HTMLElement = HTMLDivElement> = React.HTML
    * @default false
    */
   draggable?: boolean
-  
-  /** Initial position when draggable is enabled
-   * @default { x: 300, y: 200 }
-   */
-
-  /** Duration of the position change animation in milliseconds
-   * @default 16
-   */
-  positioningDuration?: number
-
-  /** Box shadow for the glass element */
-  boxShadow?: string
-  
-  /** Callback fired when the glass position changes (only when draggable) */
-  onPositionChange?: (position: { x: number; y: number }) => void
 }
 
 // Smooth interpolation (used for fade effects near the edge)
@@ -235,14 +220,11 @@ const Vaso: React.FC<VasoProps> = ({
   height,
   px = 0,
   py = 0,
-  borderRadius = 0,
+  radius = 0,
   depth = 0,
   blur = 0.25,
   dispersion = 0.5,
   draggable = false,
-  positioningDuration = 0,
-  boxShadow,
-  onPositionChange,
   ...htmlProps
 }) => {
   const uid = useId()
@@ -255,8 +237,8 @@ const Vaso: React.FC<VasoProps> = ({
 
   // Dragging state
   const [isDragging, setIsDragging] = useState(false)
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
   const [position, setPosition] = useState({ x: 0, y: 0 })
+  const dragStartRef = useRef({ mouse: { x: 0, y: 0 }, position: { x: 0, y: 0 } })
 
   // Smooth movement with requestAnimationFrame
   const smoothUpdatePosition = useCallback((newPosition: { x: number; y: number }) => {
@@ -323,22 +305,17 @@ const Vaso: React.FC<VasoProps> = ({
         container.style.left = `${position.x - finalWidth / 2}px`
         container.style.top = `${position.y - finalHeight / 2}px`
       }
-
-      if (!boxShadow) {
-        // Calculate shadow based on dimensions
-        const shadowWidth = finalWidth
-        const shadowHeight = finalHeight
-        const shadowScale = Math.min(Math.max(shadowWidth + shadowHeight, 100), 800) / 400
-        
-        const blurRadius = Math.round(4 * shadowScale)
-        const spreadRadius = Math.round(8 * shadowScale)
-        const insetBlur = Math.round(20 * shadowScale)
-        const insetOffset = Math.round(-10 * shadowScale)
-        
-        boxShadow = `0 ${blurRadius}px ${spreadRadius}px rgba(0, 0, 0, 0.25), 0 ${insetOffset}px ${insetBlur}px inset rgba(0, 0, 0, 0.15)`
-      }
-
-      container.style.boxShadow = boxShadow
+      
+      // Calculate shadow based on dimensions
+      const shadowWidth = finalWidth
+      const shadowHeight = finalHeight
+      const shadowScale = Math.min(Math.max(shadowWidth + shadowHeight, 100), 800) / 400
+      
+      const blurRadius = Math.round(4 * shadowScale)
+      const spreadRadius = Math.round(8 * shadowScale)
+      const insetBlur = Math.round(20 * shadowScale)
+      const insetOffset = Math.round(-10 * shadowScale)
+      container.style.boxShadow = `0 ${blurRadius}px ${spreadRadius}px rgba(0, 0, 0, 0.25), 0 ${insetOffset}px ${insetBlur}px inset rgba(0, 0, 0, 0.15)`
 
       // Use lower resolution for better performance
       const canvasDPI = 0.75
@@ -400,17 +377,6 @@ const Vaso: React.FC<VasoProps> = ({
     uid,
   ])
 
-
-  // Notify parent of position changes (with debouncing to prevent infinite loops)
-  useEffect(() => {
-    if (onPositionChange) {
-      const timeoutId = setTimeout(() => {
-        onPositionChange(position)
-      }, positioningDuration) // Faster position updates
-      return () => clearTimeout(timeoutId)
-    }
-  }, [position, onPositionChange]) // Don't include initialPosition to prevent loops
-
   // Update effect when any prop changes
   useEffect(() => {
     scheduleUpdate()
@@ -437,10 +403,10 @@ const Vaso: React.FC<VasoProps> = ({
       htmlProps.onMouseDown?.(e)
 
       setIsDragging(true)
-      setDragOffset({
-        x: e.clientX - position.x,
-        y: e.clientY - position.y,
-      })
+      dragStartRef.current = {
+        mouse: { x: e.clientX, y: e.clientY },
+        position: { x: position.x, y: position.y }
+      }
     },
     [draggable, position, htmlProps]
   )
@@ -450,12 +416,12 @@ const Vaso: React.FC<VasoProps> = ({
       if (!isDragging || !draggable) return
 
       const newPosition = {
-        x: e.clientX - dragOffset.x,
-        y: e.clientY - dragOffset.y,
+        x: dragStartRef.current.position.x + (e.clientX - dragStartRef.current.mouse.x),
+        y: dragStartRef.current.position.y + (e.clientY - dragStartRef.current.mouse.y),
       }
       smoothUpdatePosition(newPosition)
     },
-    [isDragging, draggable, dragOffset, smoothUpdatePosition]
+    [isDragging, draggable, smoothUpdatePosition]
   )
 
   const handleMouseUp = useCallback(() => {
@@ -472,10 +438,10 @@ const Vaso: React.FC<VasoProps> = ({
 
       const touch = e.touches[0]
       setIsDragging(true)
-      setDragOffset({
-        x: touch.clientX - position.x,
-        y: touch.clientY - position.y,
-      })
+      dragStartRef.current = {
+        mouse: { x: touch.clientX, y: touch.clientY },
+        position: { x: position.x, y: position.y }
+      }
     },
     [draggable, position, htmlProps]
   )
@@ -487,12 +453,12 @@ const Vaso: React.FC<VasoProps> = ({
       e.preventDefault()
       const touch = e.touches[0]
       const newPosition = {
-        x: touch.clientX - dragOffset.x,
-        y: touch.clientY - dragOffset.y,
+        x: dragStartRef.current.position.x + (touch.clientX - dragStartRef.current.mouse.x),
+        y: dragStartRef.current.position.y + (touch.clientY - dragStartRef.current.mouse.y),
       }
       smoothUpdatePosition(newPosition)
     },
-    [isDragging, draggable, dragOffset, smoothUpdatePosition]
+    [isDragging, draggable, smoothUpdatePosition]
   )
 
   const handleTouchEnd = useCallback(() => {
@@ -567,7 +533,7 @@ const Vaso: React.FC<VasoProps> = ({
           overflow: 'hidden',
           backdropFilter: `url(#${uid}_filter) blur(${blur}px) contrast(1) brightness(1) saturate(1)`,
           zIndex: draggable ? 999 : 1,
-          borderRadius: borderRadius || 0,
+          borderRadius: radius || 0,
           cursor: draggable ? (isDragging ? 'grabbing' : 'grab') : 'default',
           userSelect: 'none',
           transition: isDragging ? 'none' : 'transform 0.1s ease-out',

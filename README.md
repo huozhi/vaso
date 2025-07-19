@@ -26,7 +26,7 @@ function App() {
       <Vaso
         px={20}
         py={20}
-        borderRadius={15}
+        radius={15}
         depth={1.2}
         blur={0.5}
       />
@@ -46,10 +46,9 @@ function App() {
 | `height` | `number` | `undefined` | - | Explicit height of the glass element (overrides child element size) |
 | `px` | `number` | `0` | `0-100` | Horizontal padding around the glass effect |
 | `py` | `number` | `0` | `0-100` | Vertical padding around the glass effect |
-| `borderRadius` | `number` | `0` | `0-∞` | Border radius of the glass container |
+| `radius` | `number` | `0` | `0-∞` | Border radius of the glass container |
 | `depth` | `number` | `0.4` | `-2.0 to 2.0` | Distortion scale intensity (negative values create compression) |
 | `draggable` | `boolean` | `false` | - | Whether the glass can be dragged around |
-| `boxShadow` | `string` | `(auto-calculated)` | - | Box shadow for the glass element |
 
 ### Negative Values Support
 
@@ -67,8 +66,8 @@ Vaso supports negative values for several parameters to create inverted effects:
   className="w-48 h-36 bg-transparent"
   px={20}
   py={20}
-  borderRadius={12}
-  scale={1.5}
+  radius={12}
+  depth={1.5}
   blur={0.3}
 />
 ```
@@ -82,8 +81,8 @@ Vaso supports negative values for several parameters to create inverted effects:
   height={200}
   px={20}
   py={20}
-  borderRadius={12}
-  scale={1.5}
+  radius={12}
+  depth={1.5}
   blur={0.3}
 />
 ```
@@ -97,14 +96,11 @@ function DraggableGlass() {
   return (
     <Vaso
       draggable
-      initialPosition={position}
-      onPositionChange={setPosition}
       px={15}
       py={15}
-      borderRadius={20}
-      scale={1.2}
+      radius={20}
+      depth={1.2}
       blur={0.4}
-      contrast={1.3}
     />
   )
 }
@@ -118,9 +114,6 @@ function DraggableGlass() {
   px={30}
   py={30}
   depth={2.0}
-  roundness={0.8}
-  shapeWidth={0.4}
-  shapeHeight={0.3}
   blur={0.6}
 />
 ```

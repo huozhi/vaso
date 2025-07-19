@@ -13,7 +13,7 @@ function CodeGlass({ children, ...props }: { children: React.ReactNode } & VasoP
       component="span"
       px={settings.px}
       py={settings.py}
-      borderRadius={settings.borderRadius}
+      radius={settings.radius}
       blur={settings.blur}
       depth={settings.depth}
       dispersion={settings.dispersion / 2}
@@ -30,11 +30,10 @@ function VasoTitle() {
   return (
     <Vaso
       component="span"
-      positioningDuration={0}
       px={36}
       py={8}
       draggable
-      borderRadius={settings.borderRadius * 4}
+      radius={settings.radius * 4}
       depth={settings.depth}
       blur={settings.blur}
       dispersion={settings.dispersion * 1.2}
@@ -79,8 +78,8 @@ export default function Page() {
                 <input
                   type="range"
                   min="0.0"
-                  max="3.0"
-                  step="0.2"
+                  max="2.0"
+                  step="0.1"
                   value={settings.depth}
                   onChange={(e) => updateSettings({ depth: parseFloat(e.target.value) })}
                   className="w-full h-1 custom-range"
@@ -118,15 +117,15 @@ export default function Page() {
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
                   <span>Radius</span>
-                  <span className="font-mono">{settings.borderRadius}</span>
+                  <span className="font-mono">{settings.radius}</span>
                 </div>
                 <input
                   type="range"
                   min="0"
                   max="16"
                   step="2"
-                  value={settings.borderRadius}
-                  onChange={(e) => updateSettings({ borderRadius: parseInt(e.target.value) })}
+                  value={settings.radius}
+                  onChange={(e) => updateSettings({ radius: parseInt(e.target.value) })}
                   className="w-full h-1 custom-range"
                   style={{
                     background: '#9ca3af',
@@ -167,7 +166,7 @@ export default function Page() {
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Installation</h2>
               <p className="text-gray-700 mb-4">
                 Install Vaso using your preferred package manager. You can install it with{' '}
-                <HoverCodeGlass positioningDuration={0}>
+                <HoverCodeGlass>
                   <code className="px-2 py-1 text-sm text-black">npm install vaso</code>
                 </HoverCodeGlass>{' '}
               </p>
@@ -222,11 +221,7 @@ export default function Page() {
                 <CodeGlass>
                   <code className="px-2 py-1 text-sm text-black">React.memo()</code>
                 </CodeGlass>{' '}
-                to prevent unnecessary re-renders and implement{' '}
-                <CodeGlass>
-                  <code className="px-2 py-1 text-sm text-black">onPositionChange</code>
-                </CodeGlass>{' '}
-                callbacks efficiently to maintain smooth animations.
+                to prevent unnecessary re-renders
               </p>
             </section>
 

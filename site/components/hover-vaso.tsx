@@ -37,7 +37,7 @@ export function HoverCodeGlass({
       px={2}
       py={4}
       depth={0}
-      borderRadius={6}
+      radius={6}
       blur={currentBlur}
       {...props}
     >
