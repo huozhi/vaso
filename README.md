@@ -27,7 +27,7 @@ function App() {
         px={20}
         py={20}
         borderRadius={15}
-        scale={1.2}
+        depth={1.2}
         blur={0.5}
       />
     </div>
@@ -47,28 +47,15 @@ function App() {
 | `px` | `number` | `0` | `0-100` | Horizontal padding around the glass effect |
 | `py` | `number` | `0` | `0-100` | Vertical padding around the glass effect |
 | `borderRadius` | `number` | `0` | `0-∞` | Border radius of the glass container |
-| `scale` | `number` | `1.0` | `-2.0 to 2.0` | Distortion scale intensity (negative values create compression) |
-| `blur` | `number` | `0.25` | `0-10` | Blur amount applied to the background |
-| `contrast` | `number` | `1` | `0-1.0` | Contrast adjustment (1 = normal, >1 = more contrast) |
-| `brightness` | `number` | `1.0` | `0-2.0` | Brightness adjustment (1 = normal, >1 = brighter) |
-| `saturation` | `number` | `1.0` | `0-2.0` | Saturation adjustment (1 = normal, >1 = more saturated) |
-| `distortionIntensity` | `number` | `0.15` | `-1.0 to 1.0` | Intensity of the distortion effect (negative values invert effect) |
-| `roundness` | `number` | `0.6` | `-1.0 to 1.0` | Roundness of the distortion shape (negative values invert roundness) |
-| `shapeWidth` | `number` | `0.3` | `-1.0 to 1.0` | Width of the distortion shape (negative values invert horizontally) |
-| `shapeHeight` | `number` | `0.2` | `-1.0 to 1.0` | Height of the distortion shape (negative values invert vertically) |
+| `depth` | `number` | `0.4` | `-2.0 to 2.0` | Distortion scale intensity (negative values create compression) |
 | `draggable` | `boolean` | `false` | - | Whether the glass can be dragged around |
 | `boxShadow` | `string` | `(auto-calculated)` | - | Box shadow for the glass element |
-| `initialPosition` | `{ x: number; y: number }` | `{ x: 300, y: 200 }` | - | Initial position for draggable glass |
-| `onPositionChange` | `(position: { x: number; y: number }) => void` | `undefined` | - | Callback when glass position changes |
 
 ### Negative Values Support
 
 Vaso supports negative values for several parameters to create inverted effects:
 
-- **`scale`** (`-2.0 to 2.0`): Negative values create compression instead of magnification
-- **`distortionIntensity`** (`-1.0 to 1.0`): Negative values invert the distortion direction
-- **`roundness`** (`-1.0 to 1.0`): Negative values create inverted roundness effects
-- **`shapeWidth`/`shapeHeight`** (`-1.0 to 1.0`): Negative values flip the distortion horizontally/vertically
+- **`depth`** (`-2.0 to 2.0`): Negative values create compression instead of magnification
 
 ## Examples
 
@@ -130,15 +117,11 @@ function DraggableGlass() {
   className="w-48 h-36 bg-transparent"
   px={30}
   py={30}
-  scale={2.0}
-  distortionIntensity={0.35}
+  depth={2.0}
   roundness={0.8}
   shapeWidth={0.4}
   shapeHeight={0.3}
   blur={0.6}
-  contrast={1.5}
-  brightness={1.1}
-  saturation={1.2}
 />
 ```
 

@@ -16,10 +16,7 @@ function CodeGlass({ children, ...props }: { children: React.ReactNode } & VasoP
       borderRadius={settings.borderRadius}
       blur={settings.blur}
       depth={settings.depth}
-      brightness={settings.brightness}
-      saturation={settings.saturation}
       dispersion={settings.dispersion / 2}
-      distortionIntensity={settings.distortionIntensity}
       {...props}
     >
       {children}
@@ -210,11 +207,7 @@ export default function Page() {
             <section className="border-b border-gray-400 pb-4">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Advanced Features</h2>
               <p className="text-gray-700 mb-4">
-                For more complex effects, you can use{' '}
-                <CodeGlass>
-                  <code className="px-2 py-1 text-sm text-black">distortionIntensity</code>
-                </CodeGlass>{' '}
-                to control the warping effect, or enable{' '}
+                For more complex effects, you can enable{' '}
                 <CodeGlass>
                   <code className="px-2 py-1 text-sm text-black">draggable={true}</code>
                 </CodeGlass>{' '}

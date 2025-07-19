@@ -8,7 +8,6 @@ export interface GlassSettings {
   brightness?: number
   saturation?: number
   dispersion?: number
-  distortionIntensity?: number
   roundness?: number
   shapeWidth?: number
   shapeHeight?: number
@@ -25,11 +24,7 @@ interface GlassContextType {
 const defaultSettings: GlassSettings = {
   depth: 0.4,
   blur: 0.25,
-
-  brightness: 1.0,
-  saturation: 1.0,
   dispersion: 0.5,
-  distortionIntensity: 0.15,
   roundness: 0.6,
   shapeWidth: 0.3,
   shapeHeight: 0.2,

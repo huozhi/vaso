@@ -1,6 +1,11 @@
 'use client'
 
-import React, { cloneElement, useEffect, useId, useRef, useState, useCallback } from 'react'
+import React, { useEffect, useId, useRef, useState, useCallback } from 'react'
+
+const distortionIntensity = 0.15
+const roundness = 0.6
+const shapeWidth = 0.3
+const shapeHeight = 0.2
 
 const rAF = typeof window !== 'undefined' 
   ? window.requestAnimationFrame || setTimeout
@@ -61,47 +66,11 @@ export type VasoProps<Element extends HTMLElement = HTMLDivElement> = React.HTML
    * @range 0-1.0
    */
   
-  /** Brightness level for the backdrop filter
-   * @default 1.0
-   * @range 0-2.0
-   */
-  brightness?: number
-  
-  /** Saturation level for the backdrop filter
-   * @default 1.0
-   * @range 0-2.0
-   */
-  saturation?: number
-  
   /** Dispersion intensity for chromatic aberration effect (like Figma's liquid glass)
    * @default 0.5
    * @range 0-3.0
    */
   dispersion?: number
-  
-  /** Intensity of the liquid distortion effect. Negative values invert the effect
-   * @default 0.15
-   * @range -1.0 to 1.0
-   */
-  distortionIntensity?: number
-  
-  /** Roundness of the distortion shape. Negative values invert the roundness
-   * @default 0.6
-   * @range -1.0 to 1.0
-   */
-  roundness?: number
-  
-  /** Width of the distortion shape relative to container. Negative values invert horizontally
-   * @default 0.3
-   * @range -1.0 to 1.0
-   */
-  shapeWidth?: number
-  
-  /** Height of the distortion shape relative to container. Negative values invert vertically
-   * @default 0.2
-   * @range -1.0 to 1.0
-   */
-  shapeHeight?: number
   
   /** Makes the glass element draggable with mouse/touch
    * @default false
@@ -154,9 +123,6 @@ function roundedRectSDF(x: number, y: number, width: number, height: number, rad
 function createDisplacementFragment(
   uv: { x: number; y: number },
   intensity = 0.15,
-  roundness = 0.6,
-  shapeWidth = 0.3,
-  shapeHeight = 0.2,
   depth = 0
 ) {
   const ix = uv.x - 0.5
@@ -170,7 +136,6 @@ function createDisplacementFragment(
   // Determine effect direction based on parameter signs
   const depthReverse = depth < 0
   const intensityReverse = intensity < 0
-  const roundnessReverse = roundness < 0
   const widthReverse = shapeWidth < 0
   const heightReverse = shapeHeight < 0
 
@@ -180,11 +145,6 @@ function createDisplacementFragment(
   if (depthReverse || intensityReverse) {
     // Compression effect: pull inward
     effectMultiplier = 1 - scaled * 0.7
-  }
-
-  if (roundnessReverse) {
-    // Invert the roundness effect
-    effectMultiplier = 1 - effectMultiplier
   }
 
   // Apply width/height direction
@@ -205,13 +165,12 @@ const generateDisplacementData = (() => {
     width: number,
     height: number,
     intensity = 0.15,
-    roundness = 0.6,
     shapeWidth = 0.3,
     shapeHeight = 0.2,
     depth = 1.0
   ) => {
     // Create cache key including all parameters
-    const key = `${width}-${height}-${intensity}-${roundness}-${shapeWidth}-${shapeHeight}-${depth}`
+    const key = `${width}-${height}-${intensity}-${shapeWidth}-${shapeHeight}-${depth}`
 
     if (cache.has(key)) {
       return cache.get(key)!
@@ -235,7 +194,7 @@ const generateDisplacementData = (() => {
       const y = Math.floor(i / 4 / w)
       const uv = { x: x / w, y: y / h }
 
-      const pos = createDisplacementFragment(uv, intensity, roundness, shapeWidth, shapeHeight, depth)
+      const pos = createDisplacementFragment(uv, intensity, depth)
       const dx = pos.x * w - x
       const dy = pos.y * h - y
 
@@ -279,14 +238,7 @@ const Vaso: React.FC<VasoProps> = ({
   borderRadius = 0,
   depth = 0,
   blur = 0.25,
-  
-  brightness = 1.0,
-  saturation = 1.0,
   dispersion = 0.5,
-  distortionIntensity = 0.15,
-  roundness = 0.6,
-  shapeWidth = 0.3,
-  shapeHeight = 0.2,
   draggable = false,
   positioningDuration = 0,
   boxShadow,
@@ -299,7 +251,6 @@ const Vaso: React.FC<VasoProps> = ({
   const containerRef = useRef<HTMLElement>(null)
   const feImageRef = useRef<SVGFEImageElement>(null)
   const feDisplacementMapRef = useRef<SVGFEDisplacementMapElement>(null)
-  const updateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const animationFrameRef = useRef<number | null>(null)
 
   // Dragging state
@@ -405,7 +356,6 @@ const Vaso: React.FC<VasoProps> = ({
           canvasWidth,
           canvasHeight,
           distortionIntensity,
-          roundness,
           shapeWidth,
           shapeHeight,
           depth
@@ -425,7 +375,7 @@ const Vaso: React.FC<VasoProps> = ({
           feDisplacementMap.parentElement?.setAttribute('width', `${finalWidth}`)
           feDisplacementMap.parentElement?.setAttribute('height', `${finalHeight}`)
 
-          container.style.backdropFilter = `url(#${uid}_filter) blur(${blur}px) contrast(1) brightness(${brightness}) saturate(${saturation})`
+          container.style.backdropFilter = `url(#${uid}_filter) blur(${blur}px) contrast(1) brightness(1) saturate(1)`
         }
       } catch (error) {
         console.error(error)
@@ -440,8 +390,6 @@ const Vaso: React.FC<VasoProps> = ({
     py,
     depth,
     blur,
-    brightness,
-    saturation,
     dispersion,
     distortionIntensity,
     roundness,
@@ -571,9 +519,6 @@ const Vaso: React.FC<VasoProps> = ({
   // Cleanup timeouts and animation frames on unmount
   useEffect(() => {
     return () => {
-      if (updateTimeoutRef.current) {
-        clearTimeout(updateTimeoutRef.current)
-      }
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current)
       }
@@ -620,7 +565,7 @@ const Vaso: React.FC<VasoProps> = ({
           width: draggable ? width : `calc(100% + ${px * 2}px)`,
           height: draggable ? height : `calc(100% + ${py * 2}px)`,
           overflow: 'hidden',
-          backdropFilter: `url(#${uid}_filter) blur(${blur}px) contrast(1) brightness(${brightness}) saturate(${saturation})`,
+          backdropFilter: `url(#${uid}_filter) blur(${blur}px) contrast(1) brightness(1) saturate(1)`,
           zIndex: draggable ? 999 : 1,
           borderRadius: borderRadius || 0,
           cursor: draggable ? (isDragging ? 'grabbing' : 'grab') : 'default',
