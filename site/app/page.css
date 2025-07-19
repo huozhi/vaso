@@ -91,11 +91,10 @@
 .vaso-switching {
   position: absolute !important;
   top: -15px;
-  width: 70px;
-  height: 70px;
+  width: 66px;
+  height: 66px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 3;
-
 }
 
 .vaso-left {

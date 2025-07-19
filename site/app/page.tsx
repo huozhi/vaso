@@ -36,7 +36,7 @@ function VasoTitle() {
       px={36}
       py={8}
       radius={settings.radius * 4}
-      depth={settings.depth}
+      depth={1.2}
       blur={settings.blur}
       dispersion={settings.dispersion * 1.2}
     >
@@ -167,22 +167,55 @@ export default function Page() {
 
           <div className="p-8 space-y-8 rounded-lg shadow-[0_35px_60px_-15px_rgba(0,0,0,0.2),0_20px_25px_-5px_rgba(0,0,0,0.3),0_10px_10px_-5px_rgba(0,0,0,0.2)] theme-content">
             <section className="border-b pb-4 theme-section">
-              <h2 className="text-lg font-semibold mb-4 theme-heading">Installation</h2>
-              <p className="mb-4 theme-text">
-                Install Vaso using your preferred package manager. You can install it with{' '}
-                <HoverCodeGlass>
-                  <code className="px-2 py-1 text-sm theme-text">npm install vaso</code>
-                </HoverCodeGlass>{' '}
-              </p>
-
+              <h2 className="text-lg font-semibold mb-4 theme-heading">Play</h2>
               <div className="mt-6 space-y-4">
                 <div className="flex flex-col gap-4 items-start">
-                  <div className="flex flex-col gap-2">
+                  <div className="flex flex-row items-center gap-2">
                     <span className="text-sm theme-label">Theme</span>
                     <Switcher
                       options={[
-                        { id: 'light', label: 'Light' },
-                        { id: 'dark', label: 'Dark' },
+                        {
+                          id: 'light',
+                          label: 'Light',
+                          icon:
+                            theme === 'light' ? (
+                              <svg
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                              >
+                                <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="2" />
+                                <path
+                                  d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                />
+                              </svg>
+                            ) : null,
+                        },
+                        {
+                          id: 'dark',
+                          label: 'Dark',
+                          icon:
+                            theme === 'dark' ? (
+                              <svg
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                              >
+                                <path
+                                  d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  fill="currentColor"
+                                />
+                              </svg>
+                            ) : null,
+                        },
                       ]}
                       value={theme}
                       onChange={setTheme}
@@ -190,6 +223,16 @@ export default function Page() {
                   </div>
                 </div>
               </div>
+            </section>
+
+            <section className="border-b pb-4 theme-section">
+              <h2 className="text-lg font-semibold mb-4 theme-heading">Installation</h2>
+              <p className="mb-4 theme-text">
+                Install Vaso using your preferred package manager. You can install it with{' '}
+                <CodeGlass depth={0} dispersion={1.2}>
+                  <code className="px-2 py-1 text-sm theme-text">npm install vaso</code>
+                </CodeGlass>
+              </p>
             </section>
 
             <section className="border-b pb-4 theme-section">
@@ -240,22 +283,22 @@ export default function Page() {
                 </CodeGlass>{' '}
                 to make the glass element interactive and moveable by users.
               </p>
-              
             </section>
-
 
             <section>
               <p className="theme-text">
-                author:{' '}
-                <CodeGlass px={4} py={2}>
+                
+                <CodeGlass>
                   <span className="font-bold p-1 rounded-md theme-author">huozhi</span>
                 </CodeGlass>
+                <span className="theme-text">{' • '}</span>
+                <HoverCodeGlass px={4} py={2} radius={16}>
+                  <span className="font-bold p-1 rounded-md theme-author">MIT</span>
+                </HoverCodeGlass>
+
                 {/* github link */}
                 <span className="theme-text">{' • '}</span>
-                <a 
-                  href="https://github.com/huozhi/vaso" 
-                  className="font-bold underline theme-link"
-                >
+                <a href="https://github.com/huozhi/vaso" className="font-bold underline theme-link">
                   GitHub
                 </a>
               </p>
