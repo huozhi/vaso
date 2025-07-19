@@ -11,6 +11,7 @@ const rAF = typeof window !== 'undefined'
   ? window.requestAnimationFrame || setTimeout
   : (() => 0)
 
+const createBackdropFilter = (uid: string, blur: number) => `url(#${uid}_filter) blur(${blur}px) contrast(1.1) brightness(1.04) saturate(1.1)`
 
 export type VasoProps<Element extends HTMLElement = HTMLDivElement> = React.HTMLAttributes<Element> & {
   /** The HTML element or React component to render as the glass container
@@ -19,7 +20,7 @@ export type VasoProps<Element extends HTMLElement = HTMLDivElement> = React.HTML
   component?: string | React.ComponentType<React.HTMLAttributes<Element>>
   
   /** The content to be rendered inside the glass effect (required) */
-  children: React.ReactNode
+  children?: React.ReactNode
   
   /** Explicit width of the glass element in pixels
    * @default auto-calculated from content
@@ -56,7 +57,7 @@ export type VasoProps<Element extends HTMLElement = HTMLDivElement> = React.HTML
   depth?: number
   
   /** Blur amount applied to the backdrop filter in pixels
-   * @default 0.25
+   * @default 0.1
    * @range 0-10
    */
   blur?: number
@@ -222,7 +223,7 @@ const Vaso: React.FC<VasoProps> = ({
   py = 0,
   radius = 0,
   depth = 0,
-  blur = 0.25,
+  blur = 0.1,
   dispersion = 0.5,
   draggable = false,
   ...htmlProps
@@ -315,7 +316,7 @@ const Vaso: React.FC<VasoProps> = ({
       const spreadRadius = Math.round(8 * shadowScale)
       const insetBlur = Math.round(20 * shadowScale)
       const insetOffset = Math.round(-10 * shadowScale)
-      container.style.boxShadow = `0 ${blurRadius}px ${spreadRadius}px rgba(0, 0, 0, 0.25), 0 ${insetOffset}px ${insetBlur}px inset rgba(0, 0, 0, 0.15)`
+      container.style.boxShadow = `0 ${blurRadius}px ${spreadRadius}px rgba(0, 0, 0, 0.2), 0 ${insetOffset}px ${insetBlur}px inset rgba(0, 0, 0, 0.15)`
 
       // Use lower resolution for better performance
       const canvasDPI = 0.75
@@ -352,7 +353,7 @@ const Vaso: React.FC<VasoProps> = ({
           feDisplacementMap.parentElement?.setAttribute('width', `${finalWidth}`)
           feDisplacementMap.parentElement?.setAttribute('height', `${finalHeight}`)
 
-          container.style.backdropFilter = `url(#${uid}_filter) blur(${blur}px) contrast(1) brightness(1) saturate(1)`
+          container.style.backdropFilter = createBackdropFilter(uid, blur)
         }
       } catch (error) {
         console.error(error)
@@ -531,7 +532,7 @@ const Vaso: React.FC<VasoProps> = ({
           width: draggable ? width : `calc(100% + ${px * 2}px)`,
           height: draggable ? height : `calc(100% + ${py * 2}px)`,
           overflow: 'hidden',
-          backdropFilter: `url(#${uid}_filter) blur(${blur}px) contrast(1) brightness(1) saturate(1)`,
+          backdropFilter: createBackdropFilter(uid, blur),
           zIndex: draggable ? 999 : 1,
           borderRadius: radius || 0,
           cursor: draggable ? (isDragging ? 'grabbing' : 'grab') : 'default',

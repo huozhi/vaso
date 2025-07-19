@@ -87,3 +87,164 @@
     gap: 1rem !important;
   }
 }
+
+.vaso-switching {
+  position: absolute !important;
+  top: -15px;
+  width: 70px;
+  height: 70px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 3;
+
+}
+
+.vaso-left {
+  left: -10px;
+}
+
+.vaso-right {
+  left: 100%;
+  transform: translateX(calc(-100% + 10px));
+}
+
+/* Theme System */
+.root {
+  transition: background-color 500ms ease;
+}
+
+/* Light Theme (Default) */
+.root {
+  background-color: #e0e5e1;
+}
+
+.theme-title {
+  color: #111827;
+  transition: color 500ms ease;
+}
+
+.theme-subtitle {
+  color: #374151;
+  transition: color 500ms ease;
+}
+
+.theme-description {
+  color: #4b5563;
+  transition: color 500ms ease;
+}
+
+.theme-controls {
+  background-color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: background-color 500ms ease, border-color 500ms ease;
+}
+
+.theme-controls-title {
+  color: #374151;
+  transition: color 500ms ease;
+}
+
+.theme-controls-text {
+  color: #4b5563;
+  transition: color 500ms ease;
+}
+
+.theme-content {
+  background-color: #dbdcd7;
+  transition: background-color 500ms ease;
+}
+
+.theme-section {
+  border-color: #9ca3af;
+  transition: border-color 500ms ease;
+}
+
+.theme-heading {
+  color: #111827;
+  transition: color 500ms ease;
+}
+
+.theme-text {
+  color: #374151;
+  transition: color 500ms ease;
+}
+
+.theme-label {
+  color: #4b5563;
+  transition: color 500ms ease;
+}
+
+.theme-author {
+  color: #374151;
+  transition: color 500ms ease;
+}
+
+.theme-link {
+  color: #374151;
+  transition: color 500ms ease;
+}
+
+.theme-link:hover {
+  color: #111827;
+}
+
+/* Dark Theme */
+[data-theme="dark"] {
+  background-color: #111827;
+}
+
+[data-theme="dark"] .theme-title {
+  color: #ffffff;
+}
+
+[data-theme="dark"] .theme-subtitle {
+  color: #d1d5db;
+}
+
+[data-theme="dark"] .theme-description {
+  color: #d1d5db;
+}
+
+[data-theme="dark"] .theme-controls {
+  background-color: rgba(31, 41, 55, 0.9);
+  border-color: rgba(55, 65, 81, 0.5);
+}
+
+[data-theme="dark"] .theme-controls-title {
+  color: #e5e7eb;
+}
+
+[data-theme="dark"] .theme-controls-text {
+  color: #d1d5db;
+}
+
+[data-theme="dark"] .theme-content {
+  background-color: #1f2937;
+}
+
+[data-theme="dark"] .theme-section {
+  border-color: #4b5563;
+}
+
+[data-theme="dark"] .theme-heading {
+  color: #f3f4f6;
+}
+
+[data-theme="dark"] .theme-text {
+  color: #d1d5db;
+}
+
+[data-theme="dark"] .theme-label {
+  color: #9ca3af;
+}
+
+[data-theme="dark"] .theme-author {
+  color: #e5e7eb;
+}
+
+[data-theme="dark"] .theme-link {
+  color: #e5e7eb;
+}
+
+[data-theme="dark"] .theme-link:hover {
+  color: #ffffff;
+}
