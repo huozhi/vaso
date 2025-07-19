@@ -1,4 +1,5 @@
 import './globals.css'
+import { GlassProvider } from '../contexts/glass-context'
 import { JetBrains_Mono } from 'next/font/google'
 
 const jetbrainsMono = JetBrains_Mono({
@@ -11,7 +12,9 @@ const jetbrainsMono = JetBrains_Mono({
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html>
-      <body className={jetbrainsMono.className}>{children}</body>
+      <body className={jetbrainsMono.className}>
+        <GlassProvider>{children}</GlassProvider>
+      </body>
     </html>
   )
 }

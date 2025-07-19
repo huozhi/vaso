@@ -3,36 +3,44 @@
 import { useState } from 'react'
 import { Vaso, VasoProps } from '../../src'
 import { HoverCodeGlass } from '../components/hover-vaso'
+import { useGlassContext } from '../contexts/glass-context'
 import './page.css'
 
 function CodeGlass({ children, ...props }: { children: React.ReactNode } & VasoProps<HTMLSpanElement>) {
+  const { settings } = useGlassContext()
+  
   return (
-    <Vaso component="span" px={2} py={0} borderRadius={3} blur={0.25} contrast={1.1} {...props}>
+    <Vaso 
+      component="span" 
+      px={settings.px} 
+      py={settings.py} 
+      borderRadius={settings.borderRadius}
+      blur={settings.blur} 
+      contrast={settings.contrast}
+      scale={settings.scale}
+      brightness={settings.brightness}
+      saturation={settings.saturation}
+      distortionIntensity={settings.distortionIntensity}
+      {...props}
+    >
       {children}
     </Vaso>
   )
 }
 
-function VasoTitle({
-  controls,
-}: {
-  controls: {
-    scale: number
-    blur: number
-    borderRadius: number
-    contrast: number
-  }
-}) {
+function VasoTitle() {
+  const { settings } = useGlassContext()
+  
   return (
     <Vaso
       component="span"
       positioningDuration={0}
       px={36}
       py={8}
-      borderRadius={controls.borderRadius}
-      scale={controls.scale}
-      contrast={controls.contrast}
-      blur={controls.blur}
+      borderRadius={settings.borderRadius * 4}
+      scale={settings.scale}
+      contrast={settings.contrast}
+      blur={settings.blur}
     >
       <span>{'Vaso'}</span>
     </Vaso>
@@ -40,12 +48,7 @@ function VasoTitle({
 }
 
 export default function Page() {
-  const [controls, setControls] = useState({
-    scale: 0,
-    blur: 0.5,
-    borderRadius: 44,
-    contrast: 1,
-  })
+  const { settings, updateSettings } = useGlassContext()
 
   return (
     <>
@@ -56,108 +59,108 @@ export default function Page() {
         <div className="max-w-3xl mx-auto">
           <header className="mb-8 flex items-center justify-between mobile-header">
             <div className="max-w-sm mobile-title">
-              <h1 className="text-[88px] font-bold text-gray-900 mb-12 mobile-h1">
+              <h1 className="text-[88px] font-bold text-gray-900 mb-12 mobile-h1 user-select-none">
                 <small className="mobile-h1-small font-light mr-8">{'El '}</small>
-                <VasoTitle controls={controls} />
+                <VasoTitle />
               </h1>
               <p className="text-lg text-gray-600">Liquid Glass Effect for React</p>
             </div>
+          </header>
 
-            {/* Compact Controls */}
-            <div className="mt-4 bg-white/40 rounded-lg p-2 max-w-sm self-end mobile-controls">
-              {/* <p className="text-sm font-medium text-gray-700 mb-2">Glass Tuning</p> */}
-              <div className="grid grid-cols-2 gap-1 text-xs text-gray-600 mobile-controls-grid">
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span>Scale</span>
-                    <span className="font-mono">{controls.scale}</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="-2.0"
-                    max="2.0"
-                    step="0.1"
-                    value={controls.scale}
-                    onChange={(e) => setControls((prev) => ({ ...prev, scale: parseFloat(e.target.value) }))}
-                    className="w-full h-1 custom-range"
-                    style={{
-                      background: '#9ca3af',
-                      outline: 'none',
-                      borderRadius: '2px',
-                      WebkitAppearance: 'none',
-                      appearance: 'none',
-                    }}
-                  />
+          {/* Sticky Controls */}
+          <div className="fixed top-4 right-4 z-50 bg-white/90 backdrop-blur-sm rounded-lg p-3 max-w-sm border border-white/20 shadow-lg mobile-controls">
+            <p className="text-sm font-medium text-gray-700 mb-3">Glass Controls</p>
+            <div className="grid grid-cols-2 gap-2 text-xs text-gray-600 mobile-controls-grid">
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <span>Scale</span>
+                  <span className="font-mono">{settings.scale}</span>
                 </div>
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span>Blur</span>
-                    <span className="font-mono">{controls.blur}</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0.1"
-                    max="2.0"
-                    step="0.1"
-                    value={controls.blur}
-                    onChange={(e) => setControls((prev) => ({ ...prev, blur: parseFloat(e.target.value) }))}
-                    className="w-full h-1 custom-range"
-                    style={{
-                      background: '#9ca3af',
-                      outline: 'none',
-                      borderRadius: '2px',
-                      WebkitAppearance: 'none',
-                      appearance: 'none',
-                    }}
-                  />
+                <input
+                  type="range"
+                  min="-2.0"
+                  max="2.0"
+                  step="0.1"
+                  value={settings.scale}
+                  onChange={(e) => updateSettings({ scale: parseFloat(e.target.value) })}
+                  className="w-full h-1 custom-range"
+                  style={{
+                    background: '#9ca3af',
+                    outline: 'none',
+                    borderRadius: '2px',
+                    WebkitAppearance: 'none',
+                    appearance: 'none',
+                  }}
+                />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <span>Blur</span>
+                  <span className="font-mono">{settings.blur}</span>
                 </div>
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span>Radius</span>
-                    <span className="font-mono">{controls.borderRadius}</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="60"
-                    step="2"
-                    value={controls.borderRadius}
-                    onChange={(e) => setControls((prev) => ({ ...prev, borderRadius: parseInt(e.target.value) }))}
-                    className="w-full h-1 custom-range"
-                    style={{
-                      background: '#9ca3af',
-                      outline: 'none',
-                      borderRadius: '2px',
-                      WebkitAppearance: 'none',
-                      appearance: 'none',
-                    }}
-                  />
+                <input
+                  type="range"
+                  min="0.1"
+                  max="2.0"
+                  step="0.1"
+                  value={settings.blur}
+                  onChange={(e) => updateSettings({ blur: parseFloat(e.target.value) })}
+                  className="w-full h-1 custom-range"
+                  style={{
+                    background: '#9ca3af',
+                    outline: 'none',
+                    borderRadius: '2px',
+                    WebkitAppearance: 'none',
+                    appearance: 'none',
+                  }}
+                />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <span>Radius</span>
+                  <span className="font-mono">{settings.borderRadius}</span>
                 </div>
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span>Contrast</span>
-                    <span className="font-mono">{controls.contrast.toFixed(2)}</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0.2"
-                    max="1.0"
-                    step="0.2"
-                    value={controls.contrast}
-                    onChange={(e) => setControls((prev) => ({ ...prev, contrast: parseFloat(e.target.value) }))}
-                    className="w-full h-1 custom-range"
-                    style={{
-                      background: '#9ca3af',
-                      outline: 'none',
-                      borderRadius: '2px',
-                      WebkitAppearance: 'none',
-                      appearance: 'none',
-                    }}
-                  />
+                <input
+                  type="range"
+                  min="0"
+                  max="16"
+                  step="2"
+                  value={settings.borderRadius}
+                  onChange={(e) => updateSettings({ borderRadius: parseInt(e.target.value) })}
+                  className="w-full h-1 custom-range"
+                  style={{
+                    background: '#9ca3af',
+                    outline: 'none',
+                    borderRadius: '2px',
+                    WebkitAppearance: 'none',
+                    appearance: 'none',
+                  }}
+                />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <span>Contrast</span>
+                  <span className="font-mono">{settings.contrast?.toFixed(2)}</span>
                 </div>
+                <input
+                  type="range"
+                  min="0.2"
+                  max="1.0"
+                  step="0.2"
+                  value={settings.contrast}
+                  onChange={(e) => updateSettings({ contrast: parseFloat(e.target.value) })}
+                  className="w-full h-1 custom-range"
+                  style={{
+                    background: '#9ca3af',
+                    outline: 'none',
+                    borderRadius: '2px',
+                    WebkitAppearance: 'none',
+                    appearance: 'none',
+                  }}
+                />
               </div>
             </div>
-          </header>
+          </div>
 
           <div className="bg-[#dbdcd7] p-8 space-y-8 rounded-lg shadow-[0_35px_60px_-15px_rgba(0,0,0,0.2),0_20px_25px_-5px_rgba(0,0,0,0.3),0_10px_10px_-5px_rgba(0,0,0,0.2)]">
             <section className="border-b border-gray-400 pb-4">

@@ -362,9 +362,9 @@ const Vaso: React.FC<VasoProps> = ({
       const finalHeight = Math.max(1, rect.height + 2 * py)
 
       // Position distortion overlay
+      container.style.width = `${finalWidth}px`
+      container.style.height = `${finalHeight}px`
       if (draggable) {
-        container.style.width = `${finalWidth}px`
-        container.style.height = `${finalHeight}px`
         container.style.left = `${position.x - finalWidth / 2}px`
         container.style.top = `${position.y - finalHeight / 2}px`
       }
@@ -589,12 +589,14 @@ const Vaso: React.FC<VasoProps> = ({
   }, [])
 
   return (
-    <WrapComponent {...htmlProps} style={{ position: 'relative', display: 'inline-block' }}>
+    <WrapComponent 
+      {...htmlProps} 
+      style={{ position: 'relative' }}
+      // @ts-expect-error: dynamic ref assignment, improve this ref type later
+      ref={wrapperRef}
+    >
       {!draggable && (
-        cloneElement(React.Children.only(children) as React.ReactElement, {
-          // @ts-expect-error: dynamic ref assignment
-          ref: wrapperRef,
-        })
+        children
       )}
       
       {draggable && (
@@ -627,7 +629,7 @@ const Vaso: React.FC<VasoProps> = ({
         }}
       />
 
-      <svg width="0" height="0" style={{ position: 'fixed', top: 0, left: 0, zIndex: 9998 }}>
+      <svg width="0" height="0" style={{ position: 'fixed', top: 0, left: 0, zIndex: 9999 }}>
         <defs>
           <filter id={`${uid}_filter`} filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB" x="0" y="0">
             <feImage ref={feImageRef} id={`${uid}_map`} />
