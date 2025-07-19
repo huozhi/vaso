@@ -208,10 +208,10 @@ const generateDisplacementData = (() => {
     roundness = 0.6,
     shapeWidth = 0.3,
     shapeHeight = 0.2,
-    scale = 1.0
+    depth = 1.0
   ) => {
     // Create cache key including all parameters
-    const key = `${width}-${height}-${intensity}-${roundness}-${shapeWidth}-${shapeHeight}-${scale}`
+    const key = `${width}-${height}-${intensity}-${roundness}-${shapeWidth}-${shapeHeight}-${depth}`
 
     if (cache.has(key)) {
       return cache.get(key)!
@@ -235,7 +235,7 @@ const generateDisplacementData = (() => {
       const y = Math.floor(i / 4 / w)
       const uv = { x: x / w, y: y / h }
 
-      const pos = createDisplacementFragment(uv, intensity, roundness, shapeWidth, shapeHeight, scale)
+      const pos = createDisplacementFragment(uv, intensity, roundness, shapeWidth, shapeHeight, depth)
       const dx = pos.x * w - x
       const dy = pos.y * h - y
 
