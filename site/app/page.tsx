@@ -40,7 +40,7 @@ function VasoTitle() {
       borderRadius={settings.borderRadius * 4}
       depth={settings.depth}
       blur={settings.blur}
-      dispersion={settings.dispersion * 4}
+      dispersion={settings.dispersion * 1.2}
     >
       <span>{'Vaso'}</span>
     </Vaso>
@@ -148,7 +148,7 @@ export default function Page() {
                 <input
                   type="range"
                   min="0"
-                  max="3.0"
+                  max="2.0"
                   step="0.1"
                   value={settings.dispersion}
                   onChange={(e) => updateSettings({ dispersion: parseFloat(e.target.value) })}
