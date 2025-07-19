@@ -44,11 +44,11 @@ export type VasoProps<Element extends HTMLElement = HTMLDivElement> = React.HTML
    */
   borderRadius?: number
   
-  /** Scale factor for the distortion effect. Negative values create compression
+  /** Depth factor for the distortion effect. Negative values create compression
    * @default 0
-   * @range -2.0 to 2.0
+   * @range 0 to 5.0
    */
-  scale?: number
+  depth?: number
   
   /** Blur amount applied to the backdrop filter in pixels
    * @default 0.25
@@ -60,7 +60,6 @@ export type VasoProps<Element extends HTMLElement = HTMLDivElement> = React.HTML
    * @default 1
    * @range 0-1.0
    */
-  contrast?: number
   
   /** Brightness level for the backdrop filter
    * @default 1.0
@@ -73,6 +72,12 @@ export type VasoProps<Element extends HTMLElement = HTMLDivElement> = React.HTML
    * @range 0-2.0
    */
   saturation?: number
+  
+  /** Dispersion intensity for chromatic aberration effect (like Figma's liquid glass)
+   * @default 0.5
+   * @range 0-3.0
+   */
+  dispersion?: number
   
   /** Intensity of the liquid distortion effect. Negative values invert the effect
    * @default 0.15
@@ -106,7 +111,6 @@ export type VasoProps<Element extends HTMLElement = HTMLDivElement> = React.HTML
   /** Initial position when draggable is enabled
    * @default { x: 300, y: 200 }
    */
-  initialPosition?: { x: number; y: number }
 
   /** Duration of the position change animation in milliseconds
    * @default 16
@@ -153,7 +157,7 @@ function createDisplacementFragment(
   roundness = 0.6,
   shapeWidth = 0.3,
   shapeHeight = 0.2,
-  scale = 0
+  depth = 0
 ) {
   const ix = uv.x - 0.5
   const iy = uv.y - 0.5
@@ -164,7 +168,7 @@ function createDisplacementFragment(
   const scaled = smoothStep(0, 1, displacement)
 
   // Determine effect direction based on parameter signs
-  const scaleReverse = scale < 0
+  const depthReverse = depth < 0
   const intensityReverse = intensity < 0
   const roundnessReverse = roundness < 0
   const widthReverse = shapeWidth < 0
@@ -173,7 +177,7 @@ function createDisplacementFragment(
   // Calculate final effect multiplier
   let effectMultiplier = scaled
 
-  if (scaleReverse || intensityReverse) {
+  if (depthReverse || intensityReverse) {
     // Compression effect: pull inward
     effectMultiplier = 1 - scaled * 0.7
   }
@@ -204,10 +208,10 @@ const generateDisplacementData = (() => {
     roundness = 0.6,
     shapeWidth = 0.3,
     shapeHeight = 0.2,
-    scale = 1.0
+    depth = 1.0
   ) => {
     // Create cache key including all parameters
-    const key = `${width}-${height}-${intensity}-${roundness}-${shapeWidth}-${shapeHeight}-${scale}`
+    const key = `${width}-${height}-${intensity}-${roundness}-${shapeWidth}-${shapeHeight}-${depth}`
 
     if (cache.has(key)) {
       return cache.get(key)!
@@ -231,7 +235,7 @@ const generateDisplacementData = (() => {
       const y = Math.floor(i / 4 / w)
       const uv = { x: x / w, y: y / h }
 
-      const pos = createDisplacementFragment(uv, intensity, roundness, shapeWidth, shapeHeight, scale)
+      const pos = createDisplacementFragment(uv, intensity, roundness, shapeWidth, shapeHeight, depth)
       const dx = pos.x * w - x
       const dy = pos.y * h - y
 
@@ -273,17 +277,17 @@ const Vaso: React.FC<VasoProps> = ({
   px = 0,
   py = 0,
   borderRadius = 0,
-  scale = 0,
+  depth = 0,
   blur = 0.25,
-  contrast = 1,
+  
   brightness = 1.0,
   saturation = 1.0,
+  dispersion = 0.5,
   distortionIntensity = 0.15,
   roundness = 0.6,
   shapeWidth = 0.3,
   shapeHeight = 0.2,
   draggable = false,
-  initialPosition = { x: 300, y: 200 },
   positioningDuration = 0,
   boxShadow,
   onPositionChange,
@@ -301,7 +305,7 @@ const Vaso: React.FC<VasoProps> = ({
   // Dragging state
   const [isDragging, setIsDragging] = useState(false)
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
-  const [position, setPosition] = useState(initialPosition)
+  const [position, setPosition] = useState({ x: 0, y: 0 })
 
   // Smooth movement with requestAnimationFrame
   const smoothUpdatePosition = useCallback((newPosition: { x: number; y: number }) => {
@@ -404,7 +408,7 @@ const Vaso: React.FC<VasoProps> = ({
           roundness,
           shapeWidth,
           shapeHeight,
-          scale
+          depth
         )
 
         if (data.length >= 4 && canvasWidth > 0 && canvasHeight > 0) {
@@ -416,12 +420,12 @@ const Vaso: React.FC<VasoProps> = ({
           feImage.setAttribute('height', `${finalHeight}`)
 
           // Use absolute value of scale for the final calculation
-          const finalScale = Math.max(0, (maxScale * Math.abs(scale)) / canvasDPI)
+          const finalScale = Math.max(0, (maxScale * Math.abs(depth)) / canvasDPI)
           feDisplacementMap.setAttribute('scale', finalScale.toString())
           feDisplacementMap.parentElement?.setAttribute('width', `${finalWidth}`)
           feDisplacementMap.parentElement?.setAttribute('height', `${finalHeight}`)
 
-          container.style.backdropFilter = `url(#${uid}_filter) blur(${blur}px) contrast(${contrast}) brightness(${brightness}) saturate(${saturation})`
+          container.style.backdropFilter = `url(#${uid}_filter) blur(${blur}px) contrast(1) brightness(${brightness}) saturate(${saturation})`
         }
       } catch (error) {
         console.error(error)
@@ -434,11 +438,11 @@ const Vaso: React.FC<VasoProps> = ({
     height,
     px,
     py,
-    scale,
+    depth,
     blur,
-    contrast,
     brightness,
     saturation,
+    dispersion,
     distortionIntensity,
     roundness,
     shapeWidth,
@@ -448,16 +452,10 @@ const Vaso: React.FC<VasoProps> = ({
     uid,
   ])
 
-  // Update position when initialPosition changes (but don't cause infinite loops)
-  useEffect(() => {
-    if (initialPosition.x !== position.x || initialPosition.y !== position.y) {
-      setPosition(initialPosition)
-    }
-  }, [initialPosition]) // Only depend on the actual values
 
   // Notify parent of position changes (with debouncing to prevent infinite loops)
   useEffect(() => {
-    if (onPositionChange && (position.x !== initialPosition.x || position.y !== initialPosition.y)) {
+    if (onPositionChange) {
       const timeoutId = setTimeout(() => {
         onPositionChange(position)
       }, positioningDuration) // Faster position updates
@@ -588,21 +586,25 @@ const Vaso: React.FC<VasoProps> = ({
     }
   }, [])
 
+  // Update initial position when it's mounted based on the wrapperRef's node
+  useEffect(() => {
+    if (wrapperRef.current) {
+      const rect = wrapperRef.current.getBoundingClientRect()
+      setPosition({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 })
+    }
+  }, [])
+
   return (
     <WrapComponent 
-      {...htmlProps} 
+      {...htmlProps}
       style={{ position: 'relative' }}
       // @ts-expect-error: dynamic ref assignment, improve this ref type later
       ref={wrapperRef}
     >
-      {!draggable && (
-        children
-      )}
+      {children}
       
-      {draggable && (
-        <div ref={wrapperRef} style={{ position: 'absolute', visibility: 'hidden', pointerEvents: 'none' }}>
-          {children}
-        </div>
+      {draggable && position.x !== 0 && position.y !== 0 && (
+        <div style={{ position: 'absolute', visibility: 'hidden', pointerEvents: 'none' }} />
       )}
 
       <WrapComponent
@@ -618,7 +620,7 @@ const Vaso: React.FC<VasoProps> = ({
           width: draggable ? width : `calc(100% + ${px * 2}px)`,
           height: draggable ? height : `calc(100% + ${py * 2}px)`,
           overflow: 'hidden',
-          backdropFilter: `url(#${uid}_filter) blur(${blur}px) contrast(${contrast}) brightness(${brightness}) saturate(${saturation})`,
+          backdropFilter: `url(#${uid}_filter) blur(${blur}px) contrast(1) brightness(${brightness}) saturate(${saturation})`,
           zIndex: draggable ? 999 : 1,
           borderRadius: borderRadius || 0,
           cursor: draggable ? (isDragging ? 'grabbing' : 'grab') : 'default',
@@ -631,7 +633,8 @@ const Vaso: React.FC<VasoProps> = ({
 
       <svg width="0" height="0" style={{ position: 'fixed', top: 0, left: 0, zIndex: 9999 }}>
         <defs>
-          <filter id={`${uid}_filter`} filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB" x="0" y="0">
+          <filter id={`${uid}_filter`} filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB" x="-5%" y="-5%" width="110%" height="110%">
+            {/* Base displacement */}
             <feImage ref={feImageRef} id={`${uid}_map`} />
             <feDisplacementMap
               ref={feDisplacementMapRef}
@@ -639,7 +642,22 @@ const Vaso: React.FC<VasoProps> = ({
               in2={`${uid}_map`}
               xChannelSelector="R"
               yChannelSelector="G"
+              result="displaced"
             />
+            
+            {/* Chromatic aberration - separate RGB channels with dispersion-controlled offsets */}
+            <feOffset dx={dispersion} dy={dispersion} in="displaced" result="redShift" />
+            <feOffset dx="0" dy="0" in="displaced" result="greenCenter" />  
+            <feOffset dx={-dispersion} dy={-dispersion} in="displaced" result="blueShift" />
+            
+            {/* Extract color channels */}
+            <feColorMatrix in="redShift" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="redOnly" />
+            <feColorMatrix in="greenCenter" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="greenOnly" />
+            <feColorMatrix in="blueShift" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="blueOnly" />
+            
+            {/* Recombine with additive blending */}
+            <feComposite in="redOnly" in2="greenOnly" operator="lighter" result="redGreen" />
+            <feComposite in="redGreen" in2="blueOnly" operator="lighter" />
           </filter>
         </defs>
       </svg>

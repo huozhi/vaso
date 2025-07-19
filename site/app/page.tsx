@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import { Vaso, VasoProps } from '../../src'
 import { HoverCodeGlass } from '../components/hover-vaso'
 import { useGlassContext } from '../contexts/glass-context'
@@ -8,18 +7,18 @@ import './page.css'
 
 function CodeGlass({ children, ...props }: { children: React.ReactNode } & VasoProps<HTMLSpanElement>) {
   const { settings } = useGlassContext()
-  
+
   return (
-    <Vaso 
-      component="span" 
-      px={settings.px} 
-      py={settings.py} 
+    <Vaso
+      component="span"
+      px={settings.px}
+      py={settings.py}
       borderRadius={settings.borderRadius}
-      blur={settings.blur} 
-      contrast={settings.contrast}
-      scale={settings.scale}
+      blur={settings.blur}
+      depth={settings.depth}
       brightness={settings.brightness}
       saturation={settings.saturation}
+      dispersion={settings.dispersion / 2}
       distortionIntensity={settings.distortionIntensity}
       {...props}
     >
@@ -30,17 +29,18 @@ function CodeGlass({ children, ...props }: { children: React.ReactNode } & VasoP
 
 function VasoTitle() {
   const { settings } = useGlassContext()
-  
+
   return (
     <Vaso
       component="span"
       positioningDuration={0}
       px={36}
       py={8}
+      draggable
       borderRadius={settings.borderRadius * 4}
-      scale={settings.scale}
-      contrast={settings.contrast}
+      depth={settings.depth}
       blur={settings.blur}
+      dispersion={settings.dispersion * 4}
     >
       <span>{'Vaso'}</span>
     </Vaso>
@@ -55,7 +55,10 @@ export default function Page() {
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
 
-      <div className="min-h-screen p-8 pt-22 bg-[#e0e5e1] pb-32 root" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+      <div
+        className="min-h-screen p-8 pt-22 bg-[#e0e5e1] pb-32 root"
+        style={{ fontFamily: "'JetBrains Mono', monospace" }}
+      >
         <div className="max-w-3xl mx-auto">
           <header className="mb-8 flex items-center justify-between mobile-header">
             <div className="max-w-sm mobile-title">
@@ -73,16 +76,16 @@ export default function Page() {
             <div className="grid grid-cols-2 gap-2 text-xs text-gray-600 mobile-controls-grid">
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <span>Scale</span>
-                  <span className="font-mono">{settings.scale}</span>
+                  <span>Depth</span>
+                  <span className="font-mono">{settings.depth}</span>
                 </div>
                 <input
                   type="range"
-                  min="-2.0"
-                  max="2.0"
-                  step="0.1"
-                  value={settings.scale}
-                  onChange={(e) => updateSettings({ scale: parseFloat(e.target.value) })}
+                  min="0.0"
+                  max="3.0"
+                  step="0.2"
+                  value={settings.depth}
+                  onChange={(e) => updateSettings({ depth: parseFloat(e.target.value) })}
                   className="w-full h-1 custom-range"
                   style={{
                     background: '#9ca3af',
@@ -139,16 +142,16 @@ export default function Page() {
               </div>
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <span>Contrast</span>
-                  <span className="font-mono">{settings.contrast?.toFixed(2)}</span>
+                  <span>Dispersion</span>
+                  <span className="font-mono">{settings.dispersion?.toFixed(1)}</span>
                 </div>
                 <input
                   type="range"
-                  min="0.2"
-                  max="1.0"
-                  step="0.2"
-                  value={settings.contrast}
-                  onChange={(e) => updateSettings({ contrast: parseFloat(e.target.value) })}
+                  min="0"
+                  max="3.0"
+                  step="0.1"
+                  value={settings.dispersion}
+                  onChange={(e) => updateSettings({ dispersion: parseFloat(e.target.value) })}
                   className="w-full h-1 custom-range"
                   style={{
                     background: '#9ca3af',

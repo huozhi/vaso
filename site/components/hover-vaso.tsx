@@ -36,7 +36,7 @@ export function HoverCodeGlass({
       style={{ pointerEvents: 'auto', cursor: 'pointer', }}
       px={2}
       py={4}
-      scale={0}
+      depth={0}
       borderRadius={6}
       blur={currentBlur}
       {...props}

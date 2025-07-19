@@ -3,11 +3,11 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react'
 
 export interface GlassSettings {
-  scale?: number
+  depth?: number
   blur?: number
-  contrast?: number
   brightness?: number
   saturation?: number
+  dispersion?: number
   distortionIntensity?: number
   roundness?: number
   shapeWidth?: number
@@ -23,16 +23,17 @@ interface GlassContextType {
 }
 
 const defaultSettings: GlassSettings = {
-  scale: 0,
+  depth: 0.4,
   blur: 0.25,
-  contrast: 1.1,
+
   brightness: 1.0,
   saturation: 1.0,
+  dispersion: 0.5,
   distortionIntensity: 0.15,
   roundness: 0.6,
   shapeWidth: 0.3,
   shapeHeight: 0.2,
-  borderRadius: 3,
+  borderRadius: 12,
   px: 2,
   py: 0,
 }
