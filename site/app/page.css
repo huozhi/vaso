@@ -63,11 +63,6 @@
     align-self: stretch !important;
   }
   
-  .mobile-controls-grid {
-    grid-template-columns: 1fr !important;
-    gap: 0.75rem !important;
-  }
-  
   .mobile-controls .space-y-1 {
     margin-bottom: 0.5rem;
   }
@@ -83,9 +78,6 @@
     padding: 0.75rem !important;
   }
   
-  .mobile-controls-grid {
-    gap: 1rem !important;
-  }
 }
 
 .vaso-switching {
@@ -141,8 +133,7 @@
 }
 
 .theme-controls {
-  background-color: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background-color: rgba(236, 236, 236, 0.466);
   transition: background-color 500ms ease, border-color 500ms ease;
 }
 

@@ -1,10 +1,10 @@
 'use client'
 
-import { Vaso, VasoProps } from '../../src'
+import { Vaso, type VasoProps } from '../../src'
 import { Switcher } from './switcher'
 import { HoverCodeGlass } from '../components/hover-vaso'
 import { useGlassContext } from '../contexts/glass-context'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
 import './page.css'
 
@@ -51,62 +51,63 @@ const DEFAULT_VASO_HEIGHT = 60
 function IconGridDemo() {
   const vasoHeight = DEFAULT_VASO_HEIGHT // Bigger than text rows
   const [vasoWidth, setVasoWidth] = useState(DEFAULT_VASO_WIDTH) // Direct width control
-  const [isDragging, setIsDragging] = useState(false)  
-  
+  const [isDragging, setIsDragging] = useState(false)
+
   return (
     <div className="relative theme-text-bg rounded-xl p-2 w-80">
       {/* Two rows of text - no background */}
       <div className="relative select-none">
         {/* First row */}
         <div className="text-sm theme-text-bg-sample-text font-normal leading-relaxed mb-1">
-          Once upon a time in a shimmering
+          Quick start to draw a glass:
         </div>
-        
+
         {/* Second row */}
-        <div className="text-sm theme-text-bg-sample-text font-normal leading-relaxed mb-1 select-none">
-          land called Crystal Cove, there lived a glass named Vaso.
+        <div className="text-sm theme-text-bg-sample-text font-normal leading-relaxed select-none">
+          <pre className="text-xs font-mono bg-theme-text bg-sample-text/20 font-bold rounded-md">
+            <code>{`import { Vaso } from 'vaso'`}</code>
+          </pre>
         </div>
-        
+
         {/* Third row */}
         <div className="text-sm theme-text-bg-sample-text font-normal leading-relaxed mb-1 select-none">
-          Vaso was blessed by the God of SVG and became a powerful glass.
+          Vaso was blessed by the SVG filter and became a powerful glass.
         </div>
-        
+
         {/* Left-anchored Vaso with right-side draggable bar */}
-        <div className="absolute -left-[30px] top-[10px]">
+        <div className="absolute -left-[30px] top-[4px]">
           <Vaso
             width={vasoWidth}
             height={vasoHeight}
-            depth={0.8}
+            depth={0.6}
             blur={0.2}
-            dispersion={0.5}
+            dispersion={0.3}
             className="vaso-slider transition-all rounded-full shadow-gray-50/30 duration-20 ease-out"
           >
-            <div 
-              className="w-full h-full bg-transparent relative"
-              style={{ width: vasoWidth, height: vasoHeight }}
-            >
+            <div className="w-full h-full bg-transparent relative" style={{ width: vasoWidth, height: vasoHeight }}>
               {/* Right-side draggable bar */}
-              <div 
-                className={`absolute right-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-theme-text-bg-sample-text/30 rounded-full transition-all duration-80 ease-out hover:scale-x-150 hover:brightness-150 ${isDragging ? 'cursor-grabbing scale-x-150 brightness-150' : 'cursor-ew-resize'}`}
+              <div
+                className={`absolute left-[20px] top-1/2 -translate-y-1/2 w-[calc(100%-40px)] h-8 bg-theme-text-bg-sample-text/30 rounded-full transition-all duration-80 ease-out hover:scale-x-150 hover:brightness-150 ${
+                  isDragging ? 'cursor-grabbing scale-x-150 brightness-150' : 'cursor-ew-resize'
+                }`}
                 onMouseDown={(e) => {
                   setIsDragging(true)
                   const startX = e.clientX
                   const startWidth = vasoWidth
-                  
+
                   const handleMouseMove = (e: MouseEvent) => {
                     const deltaX = e.clientX - startX
                     // 1:1 movement - cursor moves same distance as width change
                     const newWidth = Math.max(30, Math.min(320 + 40, startWidth + deltaX))
                     setVasoWidth(newWidth)
                   }
-                  
+
                   const handleMouseUp = () => {
                     setIsDragging(false)
                     document.removeEventListener('pointermove', handleMouseMove)
                     document.removeEventListener('pointerup', handleMouseUp)
                   }
-                  
+
                   document.addEventListener('pointermove', handleMouseMove)
                   document.addEventListener('pointerup', handleMouseUp)
                 }}
@@ -119,8 +120,168 @@ function IconGridDemo() {
   )
 }
 
-export default function Page() {
+function VasoSlider({ 
+  value, 
+  min, 
+  max, 
+  step, 
+  onChange 
+}: { 
+  value: number
+  min: number
+  max: number
+  step: number
+  onChange: (value: number) => void
+}) {
+  const [isDragging, setIsDragging] = useState(false)
+  const trackRef = useRef<HTMLDivElement>(null)
+  
+  // Calculate position as percentage
+  const percentage = ((value - min) / (max - min)) * 100
+  const trackWidth = trackRef.current?.clientWidth || 180 // px, Track width in pixels
+  const thumbSize = 20 // Vaso thumb size
+  const thumbPosition = (percentage / 100) * (trackWidth - thumbSize)
+
+    return (
+    <div className="relative w-full h-4 flex items-center select-none">
+      {/* Background track */}
+      <div className="w-full h-1 bg-[#cdcfc1] rounded-full" ref={trackRef} />
+      
+      {/* Draggable Vaso thumb with larger touch area */}
+      <div 
+        className="absolute flex items-center justify-center"
+        style={{ 
+          left: `${thumbPosition - 4}px`, // Center the larger touch area
+          width: `${thumbSize + 8}px`, // Larger touch target
+          height: `${thumbSize + 8}px`
+        }}
+      >
+        {/* Larger invisible touch area */}
+        <div
+          className="absolute inset-0 touch-manipulation"
+          onPointerDown={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            setIsDragging(true)
+            
+            // Capture the pointer for better tracking
+            const target = e.currentTarget
+            target.setPointerCapture(e.pointerId)
+            
+            const startX = e.clientX
+            const startValue = value
+            
+            const handlePointerMove = (e: PointerEvent) => {
+              e.preventDefault()
+              const deltaX = e.clientX - startX
+              const deltaPercentage = (deltaX / (trackWidth - thumbSize)) * 100
+              const deltaValue = (deltaPercentage / 100) * (max - min)
+              const newValue = Math.max(min, Math.min(max, startValue + deltaValue))
+              
+              // Round to nearest step
+              const steppedValue = Math.round(newValue / step) * step
+              onChange(steppedValue)
+            }
+            
+            const handlePointerUp = (e: PointerEvent) => {
+              setIsDragging(false)
+              target.releasePointerCapture(e.pointerId)
+              target.removeEventListener('pointermove', handlePointerMove)
+              target.removeEventListener('pointerup', handlePointerUp)
+              target.removeEventListener('pointercancel', handlePointerUp)
+            }
+            
+            target.addEventListener('pointermove', handlePointerMove)
+            target.addEventListener('pointerup', handlePointerUp)
+            target.addEventListener('pointercancel', handlePointerUp)
+          }}
+        />
+        
+        {/* Visual Vaso thumb */}
+        <Vaso
+          width={thumbSize}
+          height={thumbSize}
+          radius={999}
+          depth={4}
+          blur={0.2}
+          dispersion={0}
+          className={`bg-[rgba(233,238,243,0.3)] transition-all duration-100 ease-out pointer-events-none ${isDragging ? 'scale-110' : 'hover:scale-105'}`}
+        >
+          <div 
+            className="w-full h-full rounded-full pointer-events-none"
+            style={{ width: thumbSize, height: thumbSize }}
+          />
+        </Vaso>
+      </div>
+    </div>
+  )
+}
+
+function GlassControls() {
   const { settings, updateSettings } = useGlassContext()
+  return (
+    <div className="fixed top-4 right-4 z-50 rounded-xl shadow-[0_35px_30px_-15px_rgba(0,0,0,0.2),0_10px_10px_-5px_rgba(0,0,0,0.3),0_10px_10px_-5px_rgba(0,0,0,0.2)] overflow-hidden">
+      <div className="backdrop-blur-sm px-6 py-3 max-w-sm mobile-controls theme-controls w-[240px] w-md-[200px]">
+        <p className="text-sm font-medium mb-3 theme-controls-title">Glass Attributes</p>
+        <div className="grid grid-cols-1 gap-2 text-xs mobile-controls-grid theme-controls-text">
+          <div>
+            <div className="flex items-center justify-between">
+              <span>Depth</span>
+              <span className="font-mono">{settings.depth.toFixed(1)}</span>
+            </div>
+            <VasoSlider
+              value={settings.depth}
+              min={0}
+              max={2}
+              step={0.1}
+              onChange={(value) => updateSettings({ depth: value })}
+            />
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <span>Blur</span>
+              <span className="font-mono">{settings.blur?.toFixed(1)}</span>
+            </div>
+            <VasoSlider
+              value={settings.blur}
+              min={0}
+              max={2}
+              step={0.2}
+              onChange={(value) => updateSettings({ blur: value })}
+            />
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <span>Radius</span>
+              <span className="font-mono">{settings.radius?.toFixed(1)}</span>
+            </div>
+            <VasoSlider
+              value={settings.radius}
+              min={0}
+              max={16}
+              step={2}
+              onChange={(value) => updateSettings({ radius: value })}
+            />
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <span>Dispersion</span>
+              <span className="font-mono">{settings.dispersion?.toFixed(1)}</span>
+            </div>
+            <VasoSlider
+              value={settings.dispersion}
+              min={0}
+              max={2}
+              step={0.1}
+              onChange={(value) => updateSettings({ dispersion: value })}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+export default function Page() {
   const [theme, setTheme] = useState('light')
 
   return (
@@ -145,99 +306,7 @@ export default function Page() {
           </header>
 
           {/* Sticky Controls */}
-          <div className="fixed top-4 right-4 z-50 backdrop-blur-sm rounded-lg p-3 max-w-sm shadow-lg mobile-controls theme-controls">
-            <p className="text-sm font-medium mb-3 theme-controls-title">Glass Controls</p>
-            <div className="grid grid-cols-2 gap-2 text-xs mobile-controls-grid theme-controls-text">
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <span>Depth</span>
-                  <span className="font-mono">{settings.depth}</span>
-                </div>
-                <input
-                  type="range"
-                  min="0.0"
-                  max="2.0"
-                  step="0.1"
-                  value={settings.depth}
-                  onChange={(e) => updateSettings({ depth: parseFloat(e.target.value) })}
-                  className="w-full h-1 custom-range"
-                  style={{
-                    background: '#9ca3af',
-                    outline: 'none',
-                    borderRadius: '2px',
-                    WebkitAppearance: 'none',
-                    appearance: 'none',
-                  }}
-                />
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <span>Blur</span>
-                  <span className="font-mono">{settings.blur}</span>
-                </div>
-                <input
-                  type="range"
-                  min="0.1"
-                  max="2.0"
-                  step="0.1"
-                  value={settings.blur}
-                  onChange={(e) => updateSettings({ blur: parseFloat(e.target.value) })}
-                  className="w-full h-1 custom-range"
-                  style={{
-                    background: '#9ca3af',
-                    outline: 'none',
-                    borderRadius: '2px',
-                    WebkitAppearance: 'none',
-                    appearance: 'none',
-                  }}
-                />
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <span>Radius</span>
-                  <span className="font-mono">{settings.radius}</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="16"
-                  step="2"
-                  value={settings.radius}
-                  onChange={(e) => updateSettings({ radius: parseInt(e.target.value) })}
-                  className="w-full h-1 custom-range"
-                  style={{
-                    background: '#9ca3af',
-                    outline: 'none',
-                    borderRadius: '2px',
-                    WebkitAppearance: 'none',
-                    appearance: 'none',
-                  }}
-                />
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <span>Dispersion</span>
-                  <span className="font-mono">{settings.dispersion?.toFixed(1)}</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="2.0"
-                  step="0.1"
-                  value={settings.dispersion}
-                  onChange={(e) => updateSettings({ dispersion: parseFloat(e.target.value) })}
-                  className="w-full h-1 custom-range"
-                  style={{
-                    background: '#9ca3af',
-                    outline: 'none',
-                    borderRadius: '2px',
-                    WebkitAppearance: 'none',
-                    appearance: 'none',
-                  }}
-                />
-              </div>
-            </div>
-          </div>
+          <GlassControls />
 
           <div className="p-8 space-y-8 rounded-lg shadow-[0_35px_60px_-15px_rgba(0,0,0,0.2),0_20px_25px_-5px_rgba(0,0,0,0.3),0_10px_10px_-5px_rgba(0,0,0,0.2)] theme-content">
             <section className="border-b pb-4 theme-section">
@@ -311,7 +380,6 @@ export default function Page() {
             <section className="border-b pb-4 theme-section">
               <h2 className="text-lg font-semibold mb-4 theme-heading">Installation</h2>
               <p className="mb-4 theme-text">
-                Install Vaso using your preferred package manager. You can install it with{' '}
                 <CodeGlass depth={0} dispersion={1.2}>
                   <code className="px-2 py-1 text-sm theme-text">npm install vaso</code>
                 </CodeGlass>
@@ -319,19 +387,17 @@ export default function Page() {
             </section>
 
             <section className="border-b pb-4 theme-section">
-              <h2 className="text-lg font-semibold mb-4 theme-heading">Quick Start</h2>
+              <h2 className="text-lg font-semibold mb-4 theme-heading">Usage</h2>
+
               <p className="mb-4 theme-text">
                 Import the{' '}
                 <CodeGlass>
-                  <code className="px-2 py-1 text-sm theme-text">Vaso</code>
+                  <code className="px-2 py-1 text-sm theme-text">{`<Vaso>`}</code>
                 </CodeGlass>{' '}
                 component in your React application and wrap it around any content you want to apply the glass effect
                 to.
               </p>
-            </section>
 
-            <section className="border-b pb-4 theme-section">
-              <h2 className="text-lg font-semibold mb-4 theme-heading">Usage</h2>
               <p className="mb-4 theme-text">
                 Vaso provides intuitive props to control every aspect of the liquid glass effect. Use{' '}
                 <CodeGlass>
@@ -370,12 +436,11 @@ export default function Page() {
 
             <section>
               <p className="theme-text">
-                
                 <CodeGlass>
                   <span className="font-bold p-1 rounded-md theme-author">huozhi</span>
                 </CodeGlass>
                 <span className="theme-text">{' • '}</span>
-                <HoverCodeGlass px={4} py={2} radius={16}>
+                <HoverCodeGlass px={4} py={2} dispersion={0} radius={16}>
                   <span className="font-bold p-1 rounded-md theme-author">MIT</span>
                 </HoverCodeGlass>
 

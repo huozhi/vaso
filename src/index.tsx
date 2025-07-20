@@ -10,7 +10,7 @@ const shapeHeight = 0.2
 const rAF = typeof window !== 'undefined' ? window.requestAnimationFrame || setTimeout : () => 0
 
 const createBackdropFilter = (uid: string, blur: number) =>
-  `url(#${uid}_filter) blur(${blur}px) contrast(1.1) brightness(1.04) saturate(1.1)`
+  `url(#${uid}_filter) blur(${blur}px) contrast(1.1) brightness(1.05) saturate(1.1)`
 
 export type VasoProps<Element extends HTMLElement = HTMLDivElement> = React.HTMLAttributes<Element> & {
   /** The HTML element or React component to render as the glass container
@@ -68,9 +68,9 @@ export type VasoProps<Element extends HTMLElement = HTMLDivElement> = React.HTML
 
   /** Dispersion intensity for chromatic aberration effect (like Figma's liquid glass)
    * @default 0.5
-   * @range 0-3.0
+   * @range 0-3.0 or false to disable
    */
-  dispersion?: number
+  dispersion?: number | false
 
   /** Makes the glass element draggable with mouse/touch
    * @default false
@@ -547,34 +547,37 @@ const Vaso: React.FC<VasoProps> = ({
               result="displaced"
             />
 
-            {/* Chromatic aberration - separate RGB channels with dispersion-controlled offsets */}
-            <feOffset dx={dispersion} dy={dispersion} in="displaced" result="redShift" />
-            <feOffset dx="0" dy="0" in="displaced" result="greenCenter" />
-            <feOffset dx={-dispersion} dy={-dispersion} in="displaced" result="blueShift" />
-
             {/* Extract color channels */}
-            <feColorMatrix
-              in="redShift"
-              type="matrix"
-              values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0"
-              result="redOnly"
-            />
-            <feColorMatrix
-              in="greenCenter"
-              type="matrix"
-              values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0"
-              result="greenOnly"
-            />
-            <feColorMatrix
-              in="blueShift"
-              type="matrix"
-              values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0"
-              result="blueOnly"
-            />
+            {dispersion && (
+              <>
+                {/* Chromatic aberration - separate RGB channels with dispersion-controlled offsets */}
+                <feOffset dx={dispersion} dy={dispersion} in="displaced" result="redShift" />
+                <feOffset dx="0" dy="0" in="displaced" result="greenCenter" />
+                <feOffset dx={-dispersion} dy={-dispersion} in="displaced" result="blueShift" />
+                <feColorMatrix
+                  in="redShift"
+                  type="matrix"
+                  values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0"
+                  result="redOnly"
+                />
+                <feColorMatrix
+                  in="greenCenter"
+                  type="matrix"
+                  values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0"
+                  result="greenOnly"
+                />
+                <feColorMatrix
+                  in="blueShift"
+                  type="matrix"
+                  values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0"
+                  result="blueOnly"
+                />
 
-            {/* Recombine with additive blending */}
-            <feComposite in="redOnly" in2="greenOnly" operator="lighter" result="redGreen" />
-            <feComposite in="redGreen" in2="blueOnly" operator="lighter" />
+                {/* Recombine with additive blending */}
+                <feComposite in="redOnly" in2="greenOnly" operator="lighter" result="redGreen" />
+                <feComposite in="redGreen" in2="blueOnly" operator="lighter" />
+              </>
+            )}
           </filter>
         </defs>
       </svg>
