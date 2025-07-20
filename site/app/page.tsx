@@ -4,9 +4,78 @@ import { Vaso, type VasoProps } from '../../src'
 import { Switcher } from './switcher'
 import { HoverCodeGlass } from '../components/hover-vaso'
 import { useGlassContext } from '../contexts/glass-context'
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 
 import './page.css'
+
+// Browser support detection
+function detectBrowserSupport() {
+  if (typeof window === 'undefined') return { isSupported: true }
+  
+  const userAgent = navigator.userAgent.toLowerCase()
+  
+  // Safari detection (including mobile Safari)
+  const isSafari = /safari/.test(userAgent) && !/chrome/.test(userAgent)
+  
+  // Firefox detection
+  const isFirefox = /firefox/.test(userAgent)
+  
+  // Check for SVG filter support
+  const svgSupported = 'createElementNS' in document && 
+    document.createElementNS('http://www.w3.org/2000/svg', 'feDisplacementMap') instanceof SVGElement
+  
+  // Check for backdrop-filter support
+  const backdropFilterSupported = CSS.supports('backdrop-filter', 'blur(1px)')
+  
+  let browser = 'unknown'
+  if (isSafari) browser = 'safari'
+  else if (isFirefox) browser = 'firefox'
+  
+  const isSupported = svgSupported && backdropFilterSupported && !isSafari && !isFirefox
+  
+  return { isSupported, browser }
+}
+
+function BrowserWarning() {
+  const [showWarning, setShowWarning] = useState(false)
+
+  useEffect(() => {
+    const info = detectBrowserSupport()
+    setShowWarning(!info.isSupported)
+  }, [])
+
+  if (!showWarning) return null
+
+  return (
+    <div className="sticky top-4 z-40 w-full mb-4">
+      <div className="bg-amber-300/50 rounded-lg p-4 shadow-lg backdrop-blur-sm">
+        <div className="flex items-start gap-3">
+          <div className="flex-shrink-0">
+            <svg className="w-5 h-5 text-amber-400/50" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-sm font-medium text-amber-800">
+              Vaso is not supported in your browser
+            </h3>
+            <p className="mt-2 text-sm text-amber-700">
+              Your browser may not fully support the advanced glass effects used on this page.
+            </p>
+            <div>
+              <button
+                onClick={() => setShowWarning(false)}
+                className="text-xs font-medium text-amber-800 hover:text-amber-900 underline"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function CodeGlass({ children, ...props }: { children: React.ReactNode } & VasoProps<HTMLSpanElement>) {
   const { settings } = useGlassContext()
@@ -36,7 +105,7 @@ function VasoTitle() {
       px={36}
       py={8}
       radius={settings.radius * 4}
-      depth={1.2}
+      depth={Math.max(1.1, settings.depth)}
       blur={settings.blur}
       dispersion={settings.dispersion * 1.2}
     >
@@ -304,6 +373,9 @@ export default function Page() {
               <p className="text-lg theme-description">Liquid Glass Effect for React</p>
             </div>
           </header>
+
+          {/* Browser compatibility warning */}
+          <BrowserWarning />
 
           {/* Sticky Controls */}
           <GlassControls />
