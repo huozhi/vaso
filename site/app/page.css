@@ -278,3 +278,10 @@
 [data-theme="dark"] .theme-slider {
   background-color: #cccfc1;
 }
+.vaso-slider-thumb {
+  background-color: #cdcfc1;
+  border-radius: 999px;
+}
+[data-theme="dark"] .vaso-slider-thumb {
+  background-color: #e5e5e579;
+}

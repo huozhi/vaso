@@ -145,7 +145,7 @@ function VasoSlider({
     return (
     <div className="relative w-full h-4 flex items-center select-none">
       {/* Background track */}
-      <div className="w-full h-1 bg-[#cdcfc1] rounded-full" ref={trackRef} />
+      <div className="w-full h-1 bg-[#cdcfc1a8] rounded-full" ref={trackRef} />
       
       {/* Draggable Vaso thumb with larger touch area */}
       <div 
@@ -205,7 +205,7 @@ function VasoSlider({
           depth={4}
           blur={0.2}
           dispersion={0}
-          className={`bg-[rgba(233,238,243,0.3)] transition-all duration-100 ease-out pointer-events-none ${isDragging ? 'scale-110' : 'hover:scale-105'}`}
+          className={`vaso-slider-thumb transition-all duration-100 ease-out pointer-events-none ${isDragging ? 'scale-110' : 'hover:scale-105'}`}
         >
           <div 
             className="w-full h-full rounded-full pointer-events-none"
