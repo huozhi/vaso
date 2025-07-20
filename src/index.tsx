@@ -7,72 +7,71 @@ const roundness = 0.6
 const shapeWidth = 0.3
 const shapeHeight = 0.2
 
-const rAF = typeof window !== 'undefined' 
-  ? window.requestAnimationFrame || setTimeout
-  : (() => 0)
+const rAF = typeof window !== 'undefined' ? window.requestAnimationFrame || setTimeout : () => 0
 
-const createBackdropFilter = (uid: string, blur: number) => `url(#${uid}_filter) blur(${blur}px) contrast(1.1) brightness(1.04) saturate(1.1)`
+const createBackdropFilter = (uid: string, blur: number) =>
+  `url(#${uid}_filter) blur(${blur}px) contrast(1.1) brightness(1.04) saturate(1.1)`
 
 export type VasoProps<Element extends HTMLElement = HTMLDivElement> = React.HTMLAttributes<Element> & {
   /** The HTML element or React component to render as the glass container
    * @default 'div'
    */
   component?: string | React.ComponentType<React.HTMLAttributes<Element>>
-  
+
   /** The content to be rendered inside the glass effect (required) */
   children?: React.ReactNode
-  
+
   /** Explicit width of the glass element in pixels
    * @default auto-calculated from content
    */
   width?: number
-  
+
   /** Explicit height of the glass element in pixels
    * @default auto-calculated from content
    */
   height?: number
-  
+
   /** Horizontal padding around the glass effect in pixels
    * @default 0
    * @range 0-100
    */
   px?: number
-  
+
   /** Vertical padding around the glass effect in pixels
    * @default 0
    * @range 0-100
    */
   py?: number
-  
+
   /** Border radius of the glass container in pixels
    * @default 0
    * @range 0-Infinity
    */
   radius?: number
-  
+
   /** Depth factor for the distortion effect. Negative values create compression
    * @default 0
    * @range 0 to 5.0
    */
   depth?: number
-  
+
   /** Blur amount applied to the backdrop filter in pixels
    * @default 0.1
    * @range 0-10
    */
   blur?: number
-  
+
   /** Contrast level for the backdrop filter
    * @default 1
    * @range 0-1.0
    */
-  
+
   /** Dispersion intensity for chromatic aberration effect (like Figma's liquid glass)
    * @default 0.5
    * @range 0-3.0
    */
   dispersion?: number
-  
+
   /** Makes the glass element draggable with mouse/touch
    * @default false
    */
@@ -106,11 +105,7 @@ function roundedRectSDF(x: number, y: number, width: number, height: number, rad
 }
 
 // Fragment simulation: computes UV displacement with full negative support
-function createDisplacementFragment(
-  uv: { x: number; y: number },
-  intensity = 0.15,
-  depth = 0
-) {
+function createDisplacementFragment(uv: { x: number; y: number }, intensity = 0.15, depth = 0) {
   const ix = uv.x - 0.5
   const iy = uv.y - 0.5
 
@@ -147,14 +142,7 @@ function createDisplacementFragment(
 const generateDisplacementData = (() => {
   const cache = new Map<string, { data: Uint8ClampedArray; maxScale: number }>()
 
-  return (
-    width: number,
-    height: number,
-    intensity = 0.15,
-    shapeWidth = 0.3,
-    shapeHeight = 0.2,
-    depth = 1.0
-  ) => {
+  return (width: number, height: number, intensity = 0.15, shapeWidth = 0.3, shapeHeight = 0.2, depth = 1.0) => {
     // Create cache key including all parameters
     const key = `${width}-${height}-${intensity}-${shapeWidth}-${shapeHeight}-${depth}`
 
@@ -252,10 +240,9 @@ const Vaso: React.FC<VasoProps> = ({
     })
   }, [])
 
-
   // Optimized update function with requestAnimationFrame
   const updateEffectRef = useRef<number | null>(null)
-  
+
   const scheduleUpdate = useCallback(() => {
     if (updateEffectRef.current) {
       cancelAnimationFrame(updateEffectRef.current)
@@ -299,19 +286,15 @@ const Vaso: React.FC<VasoProps> = ({
       const finalWidth = Math.max(1, rect.width + 2 * px)
       const finalHeight = Math.max(1, rect.height + 2 * py)
 
-      // Position distortion overlay
+      // Size distortion overlay (positioning handled by inline styles)
       container.style.width = `${finalWidth}px`
       container.style.height = `${finalHeight}px`
-      if (draggable) {
-        container.style.left = `${position.x - finalWidth / 2}px`
-        container.style.top = `${position.y - finalHeight / 2}px`
-      }
-      
+
       // Calculate shadow based on dimensions
       const shadowWidth = finalWidth
       const shadowHeight = finalHeight
       const shadowScale = Math.min(Math.max(shadowWidth + shadowHeight, 100), 800) / 400
-      
+
       const blurRadius = Math.round(4 * shadowScale)
       const spreadRadius = Math.round(8 * shadowScale)
       const insetBlur = Math.round(20 * shadowScale)
@@ -383,9 +366,9 @@ const Vaso: React.FC<VasoProps> = ({
     scheduleUpdate()
   }, [scheduleUpdate])
 
-  // Only draggable elements need scroll/resize handling
+  // Draggable elements need to recalculate position on scroll/resize
   const scrollRafRef = useRef<number | null>(null)
-  
+
   useEffect(() => {
     // Non-draggable elements use relative positioning and don't need repositioning
     return () => {
@@ -406,7 +389,7 @@ const Vaso: React.FC<VasoProps> = ({
       setIsDragging(true)
       dragStartRef.current = {
         mouse: { x: e.clientX, y: e.clientY },
-        position: { x: position.x, y: position.y }
+        position: { x: position.x, y: position.y },
       }
     },
     [draggable, position, htmlProps]
@@ -433,7 +416,7 @@ const Vaso: React.FC<VasoProps> = ({
   const handleTouchStart = useCallback(
     (e: React.TouchEvent) => {
       if (!draggable) return
-      
+
       // @ts-expect-error: dynamic ref assignment, improve this ref type later
       htmlProps.onTouchStart?.(e)
 
@@ -441,7 +424,7 @@ const Vaso: React.FC<VasoProps> = ({
       setIsDragging(true)
       dragStartRef.current = {
         mouse: { x: touch.clientX, y: touch.clientY },
-        position: { x: position.x, y: position.y }
+        position: { x: position.x, y: position.y },
       }
     },
     [draggable, position, htmlProps]
@@ -498,7 +481,7 @@ const Vaso: React.FC<VasoProps> = ({
     }
   }, [])
 
-  // Update initial position when it's mounted based on the wrapperRef's node
+  // Update initial position when it's mounted - use a simpler, more reliable approach
   useEffect(() => {
     if (wrapperRef.current) {
       const rect = wrapperRef.current.getBoundingClientRect()
@@ -507,45 +490,52 @@ const Vaso: React.FC<VasoProps> = ({
   }, [])
 
   return (
-    <WrapComponent 
+    <WrapComponent
       {...htmlProps}
-      style={{ position: 'relative' }}
+      style={{ position: 'relative', ...htmlProps.style }}
       // @ts-expect-error: dynamic ref assignment, improve this ref type later
       ref={wrapperRef}
     >
       {children}
-      
+
       {draggable && position.x !== 0 && position.y !== 0 && (
         <div style={{ position: 'absolute', visibility: 'hidden', pointerEvents: 'none' }} />
       )}
 
       <WrapComponent
-        data-vaso-id={uid}
+        data-vaso={uid}
         // @ts-expect-error: dynamic ref assignment, improve this ref type later
         ref={containerRef}
         onMouseDown={handleMouseDown}
         onTouchStart={handleTouchStart}
         style={{
           position: draggable ? 'fixed' : 'absolute',
-          top: draggable ? position.y - (height || 0) / 2 : -py,
-          left: draggable ? position.x - (width || 0) / 2 : -px,
-          width: draggable ? width : `calc(100% + ${px * 2}px)`,
-          height: draggable ? height : `calc(100% + ${py * 2}px)`,
+          top: draggable ? position.y - ((height || 0) + py * 2) / 2 : -py,
+          left: draggable ? position.x - ((width || 0) + px * 2) / 2 : -px,
+          width: draggable ? (width || 0) + px * 2 : `calc(100% + ${px * 2}px)`,
+          height: draggable ? (height || 0) + py * 2 : `calc(100% + ${py * 2}px)`,
           overflow: 'hidden',
           backdropFilter: createBackdropFilter(uid, blur),
           zIndex: draggable ? 999 : 1,
-          borderRadius: radius || 0,
+          ...(radius && { borderRadius: radius }),
           cursor: draggable ? (isDragging ? 'grabbing' : 'grab') : 'default',
           userSelect: 'none',
           transition: isDragging ? 'none' : 'transform 0.1s ease-out',
           pointerEvents: draggable ? 'auto' : 'none',
-          ...htmlProps.style,
         }}
       />
 
       <svg width="0" height="0" style={{ position: 'fixed', top: 0, left: 0, zIndex: 9999 }}>
         <defs>
-          <filter id={`${uid}_filter`} filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB" x="-5%" y="-5%" width="110%" height="110%">
+          <filter
+            id={`${uid}_filter`}
+            filterUnits="userSpaceOnUse"
+            colorInterpolationFilters="sRGB"
+            x="-5%"
+            y="-5%"
+            width="110%"
+            height="110%"
+          >
             {/* Base displacement */}
             <feImage ref={feImageRef} id={`${uid}_map`} />
             <feDisplacementMap
@@ -556,17 +546,32 @@ const Vaso: React.FC<VasoProps> = ({
               yChannelSelector="G"
               result="displaced"
             />
-            
+
             {/* Chromatic aberration - separate RGB channels with dispersion-controlled offsets */}
             <feOffset dx={dispersion} dy={dispersion} in="displaced" result="redShift" />
-            <feOffset dx="0" dy="0" in="displaced" result="greenCenter" />  
+            <feOffset dx="0" dy="0" in="displaced" result="greenCenter" />
             <feOffset dx={-dispersion} dy={-dispersion} in="displaced" result="blueShift" />
-            
+
             {/* Extract color channels */}
-            <feColorMatrix in="redShift" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="redOnly" />
-            <feColorMatrix in="greenCenter" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="greenOnly" />
-            <feColorMatrix in="blueShift" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="blueOnly" />
-            
+            <feColorMatrix
+              in="redShift"
+              type="matrix"
+              values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0"
+              result="redOnly"
+            />
+            <feColorMatrix
+              in="greenCenter"
+              type="matrix"
+              values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0"
+              result="greenOnly"
+            />
+            <feColorMatrix
+              in="blueShift"
+              type="matrix"
+              values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0"
+              result="blueOnly"
+            />
+
             {/* Recombine with additive blending */}
             <feComposite in="redOnly" in2="greenOnly" operator="lighter" result="redGreen" />
             <feComposite in="redGreen" in2="blueOnly" operator="lighter" />

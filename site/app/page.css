@@ -106,6 +106,15 @@
   transform: translateX(calc(-100% + 10px));
 }
 
+.vaso-slider [data-vaso] {
+  border-radius: 999px;
+}
+.vaso-slider [data-vaso] {
+  box-shadow: 0px -1px 8px rgba(55, 53, 45, 0.2) !important;
+}
+[data-theme="dark"] .vaso-slider [data-vaso] {
+  box-shadow: 0px -1px 8px rgba(160, 183, 187, 0.2) !important;
+}
 /* Theme System */
 .root {
   transition: background-color 500ms ease;
@@ -153,7 +162,7 @@
 }
 
 .theme-section {
-  border-color: #9ca3af;
+  border-color: rgba(156, 163, 175, 0.3);
   transition: border-color 500ms ease;
 }
 
@@ -221,7 +230,7 @@
 }
 
 [data-theme="dark"] .theme-section {
-  border-color: #4b5563;
+  border-color: rgba(75, 85, 99, 0.5);
 }
 
 [data-theme="dark"] .theme-heading {
@@ -246,4 +255,35 @@
 
 [data-theme="dark"] .theme-link:hover {
   color: #ffffff;
+}
+
+/* Divider */
+.theme-divider {
+  background-color: rgba(156, 163, 175, 0.3);
+}
+
+[data-theme="dark"] .theme-divider {
+  background-color: rgba(75, 85, 99, 0.5);
+}
+
+.theme-text-bg {
+  background-color: #cccfc1;
+}
+
+[data-theme="dark"] .theme-text-bg {
+  background-color: #171f28;
+}
+
+.theme-text-bg-sample-text {
+  color: #66717c;
+}
+[data-theme="dark"] .theme-text-bg-sample-text {
+  color: #cccfc1;
+}
+
+.theme-slider {
+  background-color: #bcbcbc;
+}
+[data-theme="dark"] .theme-slider {
+  background-color: #cccfc1;
 }

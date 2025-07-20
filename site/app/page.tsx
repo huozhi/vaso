@@ -45,6 +45,80 @@ function VasoTitle() {
   )
 }
 
+const DEFAULT_VASO_WIDTH = 130
+const DEFAULT_VASO_HEIGHT = 60
+
+function IconGridDemo() {
+  const vasoHeight = DEFAULT_VASO_HEIGHT // Bigger than text rows
+  const [vasoWidth, setVasoWidth] = useState(DEFAULT_VASO_WIDTH) // Direct width control
+  const [isDragging, setIsDragging] = useState(false)  
+  
+  return (
+    <div className="relative theme-text-bg rounded-xl p-2 w-80">
+      {/* Two rows of text - no background */}
+      <div className="relative select-none">
+        {/* First row */}
+        <div className="text-sm theme-text-bg-sample-text font-normal leading-relaxed mb-1">
+          Once upon a time in a shimmering
+        </div>
+        
+        {/* Second row */}
+        <div className="text-sm theme-text-bg-sample-text font-normal leading-relaxed mb-1 select-none">
+          land called Crystal Cove, there lived a glass named Vaso.
+        </div>
+        
+        {/* Third row */}
+        <div className="text-sm theme-text-bg-sample-text font-normal leading-relaxed mb-1 select-none">
+          Vaso was blessed by the God of SVG and became a powerful glass.
+        </div>
+        
+        {/* Left-anchored Vaso with right-side draggable bar */}
+        <div className="absolute -left-[30px] top-[10px]">
+          <Vaso
+            width={vasoWidth}
+            height={vasoHeight}
+            depth={0.8}
+            blur={0.2}
+            dispersion={0.5}
+            className="vaso-slider transition-all rounded-full shadow-gray-50/30 duration-20 ease-out"
+          >
+            <div 
+              className="w-full h-full bg-transparent relative"
+              style={{ width: vasoWidth, height: vasoHeight }}
+            >
+              {/* Right-side draggable bar */}
+              <div 
+                className={`absolute right-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-theme-text-bg-sample-text/30 rounded-full transition-all duration-80 ease-out hover:scale-x-150 hover:brightness-150 ${isDragging ? 'cursor-grabbing scale-x-150 brightness-150' : 'cursor-ew-resize'}`}
+                onMouseDown={(e) => {
+                  setIsDragging(true)
+                  const startX = e.clientX
+                  const startWidth = vasoWidth
+                  
+                  const handleMouseMove = (e: MouseEvent) => {
+                    const deltaX = e.clientX - startX
+                    // 1:1 movement - cursor moves same distance as width change
+                    const newWidth = Math.max(30, Math.min(320 + 40, startWidth + deltaX))
+                    setVasoWidth(newWidth)
+                  }
+                  
+                  const handleMouseUp = () => {
+                    setIsDragging(false)
+                    document.removeEventListener('pointermove', handleMouseMove)
+                    document.removeEventListener('pointerup', handleMouseUp)
+                  }
+                  
+                  document.addEventListener('pointermove', handleMouseMove)
+                  document.addEventListener('pointerup', handleMouseUp)
+                }}
+              />
+            </div>
+          </Vaso>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Page() {
   const { settings, updateSettings } = useGlassContext()
   const [theme, setTheme] = useState('light')
@@ -168,13 +242,14 @@ export default function Page() {
           <div className="p-8 space-y-8 rounded-lg shadow-[0_35px_60px_-15px_rgba(0,0,0,0.2),0_20px_25px_-5px_rgba(0,0,0,0.3),0_10px_10px_-5px_rgba(0,0,0,0.2)] theme-content">
             <section className="border-b pb-4 theme-section">
               <h2 className="text-lg font-semibold mb-4 theme-heading">Play</h2>
-              <div className="mt-6 space-y-4">
-                <div className="flex flex-col gap-4 items-start">
-                  <div className="flex flex-row items-center gap-2">
-                    <span className="text-sm theme-label">Theme</span>
-                    <Switcher
-                      options={[
-                        {
+              <div className="mt-6">
+                {/* Row with two examples and divider */}
+                <div className="relative grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+                  {/* Theme Switcher Example */}
+                  <div className="flex flex-col gap-3 items-start mt-6">
+                    <div className="flex justify-start">
+                      <Switcher
+                        xOption={{
                           id: 'light',
                           label: 'Light',
                           icon:
@@ -194,8 +269,8 @@ export default function Page() {
                                 />
                               </svg>
                             ) : null,
-                        },
-                        {
+                        }}
+                        yOption={{
                           id: 'dark',
                           label: 'Dark',
                           icon:
@@ -215,11 +290,19 @@ export default function Page() {
                                 />
                               </svg>
                             ) : null,
-                        },
-                      ]}
-                      value={theme}
-                      onChange={setTheme}
-                    />
+                        }}
+                        value={theme}
+                        onChange={setTheme}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Vertical Divider (hidden on mobile) */}
+                  <div className="hidden md:block absolute left-1/2 top-0 bottom-0 w-px theme-divider transform -translate-x-1/2"></div>
+
+                  {/* Icon Grid with Vaso Control Example */}
+                  <div className="flex flex-col items-start px-4">
+                    <IconGridDemo />
                   </div>
                 </div>
               </div>

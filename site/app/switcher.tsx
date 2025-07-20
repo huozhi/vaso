@@ -1,16 +1,21 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { Vaso } from '../../src/index'
 import clsx from 'clsx'
 
 export interface SwitcherProps {
   /** Options for the switcher */
-  options: {
+  xOption: {
     id: string
     label: string
     icon?: React.ReactNode
-  }[]
+  }
+  yOption: {
+    id: string
+    label: string
+    icon?: React.ReactNode
+  }
   /** Currently active option ID */
   value?: string
   /** Callback when option changes */
@@ -19,18 +24,18 @@ export interface SwitcherProps {
   className?: string
 }
 
-export const Switcher: React.FC<SwitcherProps> = ({ options = [], value = options[0]?.id, onChange }) => {
+export const Switcher: React.FC<SwitcherProps> = ({ xOption, yOption, value = xOption.id, onChange }) => {
   const [activeOption, setActiveOption] = useState(value)
+  const options = useMemo(() => [xOption, yOption], [xOption, yOption])
 
   const handleOptionChange = (optionId: string) => {
     setActiveOption(optionId)
     onChange?.(optionId)
   }
 
-  const activeIndex = options.findIndex((option) => option.id === activeOption)
-  const isLeft = activeIndex === 0
+  const isLeft = activeOption === xOption.id
 
-  const isDarkTheme = activeOption === 'dark'
+  const isDarkTheme = activeOption === yOption.id
 
   return (
     <div
@@ -43,7 +48,7 @@ export const Switcher: React.FC<SwitcherProps> = ({ options = [], value = option
       {options.map((option) => (
         <button
           key={option.id}
-          onClick={() => handleOptionChange(option.id)}
+          onClick={() => handleOptionChange(isLeft ? yOption.id : xOption.id)}
           className={clsx(
             'relative bg-transparent border-0 rounded-full cursor-pointer flex-1',
             'flex items-center justify-center text-sm font-medium',
