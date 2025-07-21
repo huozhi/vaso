@@ -248,13 +248,17 @@
   color: #ffffff;
 }
 
-/* Divider */
-.theme-divider {
-  background-color: rgba(156, 163, 175, 0.3);
+:root {
+  --theme-border-color: rgba(156, 163, 175, 0.3);
 }
 
-[data-theme="dark"] .theme-divider {
-  background-color: rgba(75, 85, 99, 0.5);
+[data-theme="dark"] :root {
+  --theme-border-color: rgba(75, 85, 99, 0.5);
+}
+
+/* Divider */
+.theme-divider {
+  background-color: var(--theme-border-color);
 }
 
 .theme-text-bg {

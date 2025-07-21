@@ -496,8 +496,6 @@ const Vaso: React.FC<VasoProps> = ({
       // @ts-expect-error: dynamic ref assignment, improve this ref type later
       ref={wrapperRef}
     >
-      {children}
-
       {draggable && position.x !== 0 && position.y !== 0 && (
         <div style={{ position: 'absolute', visibility: 'hidden', pointerEvents: 'none' }} />
       )}
@@ -516,7 +514,7 @@ const Vaso: React.FC<VasoProps> = ({
           height: draggable ? (height || 0) + py * 2 : `calc(100% + ${py * 2}px)`,
           overflow: 'hidden',
           backdropFilter: createBackdropFilter(uid, blur),
-          zIndex: draggable ? 999 : 1,
+          ...(draggable && { zIndex: htmlProps.style?.zIndex || 999 }),
           ...(radius && { borderRadius: radius }),
           cursor: draggable ? (isDragging ? 'grabbing' : 'grab') : 'default',
           userSelect: 'none',
@@ -525,7 +523,7 @@ const Vaso: React.FC<VasoProps> = ({
         }}
       />
 
-      <svg width="0" height="0" style={{ position: 'fixed', top: 0, left: 0, zIndex: 9999 }}>
+      <svg width="0" height="0" style={{ position: 'fixed', top: 0, left: 0, zIndex: htmlProps.style?.zIndex || 999 }}>
         <defs>
           <filter
             id={`${uid}_filter`}
@@ -582,6 +580,8 @@ const Vaso: React.FC<VasoProps> = ({
         </defs>
       </svg>
       <canvas ref={canvasRef} style={{ display: 'none' }} />
+
+      {children}
     </WrapComponent>
   )
 }
