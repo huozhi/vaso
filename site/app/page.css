@@ -43,10 +43,6 @@
     gap: 1rem !important;
   }
   
-  .root {
-    padding: 32px 16px !important;
-  }
-
   .mobile-title {
     max-width: 100% !important;
   }

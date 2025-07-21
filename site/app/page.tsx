@@ -128,7 +128,7 @@ function IconGridDemo() {
   const { settings } = useGlassContext()
 
   return (
-    <div className="relative theme-text-bg rounded-xl p-2 w-80">
+    <div className="relative theme-text-bg rounded-xl p-2 w-80 max-w-full">
       {/* Two rows of text - no background */}
       <div className="relative select-none">
         {/* First row */}
@@ -297,7 +297,7 @@ function GlassControls() {
   const { settings, updateSettings } = useGlassContext()
   return (
     <div className="fixed top-4 right-4 z-10 rounded-xl shadow-[0_35px_30px_-15px_rgba(0,0,0,0.2),0_10px_10px_-5px_rgba(0,0,0,0.3),0_10px_10px_-5px_rgba(0,0,0,0.2)] overflow-hidden">
-      <div className="backdrop-blur-sm px-6 py-3 max-w-sm mobile-controls theme-controls w-[240px] w-md-[200px]">
+      <div className="backdrop-blur-sm px-6 py-3 max-w-sm mobile-controls theme-controls lg:w-[240px] sm:w-[160px]">
         <p className="text-sm font-medium mb-3 theme-controls-title">Glass Attributes</p>
         <div className="grid grid-cols-1 gap-2 text-xs mobile-controls-grid theme-controls-text">
           <div>
@@ -516,7 +516,7 @@ export default function Page() {
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
 
       <div
-        className="min-h-screen p-8 pt-22 pb-32 root"
+        className="min-h-screen lg:p-8 lg:pt-22 lg:pb-32 p-2 pt-8 pb-8 root"
         data-theme={theme}
         style={{ fontFamily: "'JetBrains Mono', monospace" }}
       >
@@ -537,7 +537,7 @@ export default function Page() {
           {/* Sticky Controls */}
           <GlassControls />
 
-          <div className="p-8 space-y-8 rounded-lg shadow-[0_35px_60px_-15px_rgba(0,0,0,0.2),0_20px_25px_-5px_rgba(0,0,0,0.3),0_10px_10px_-5px_rgba(0,0,0,0.2)] theme-content">
+          <div className="lg:p-8 sm:p-4 space-y-8 rounded-lg shadow-[0_35px_60px_-15px_rgba(0,0,0,0.2),0_20px_25px_-5px_rgba(0,0,0,0.3),0_10px_10px_-5px_rgba(0,0,0,0.2)] theme-content">
             <section className="relative border-b pb-4 theme-section">
               <h2 className="text-lg font-semibold mb-4 theme-heading">Play</h2>
               <div className="mt-2 relative border-t border-[var(--theme-border-color)] py-4">
