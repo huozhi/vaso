@@ -138,7 +138,7 @@ function IconGridDemo() {
 
         {/* Second row */}
         <div className="text-sm theme-text-bg-sample-text font-normal leading-relaxed select-none">
-          <pre className="text-xs font-mono bg-theme-text bg-sample-text/20 font-bold rounded-md">
+          <pre className="text-xs font-mono bg-theme-text bg-sample-text/20 font-bold rounded-md whitespace-break-spaces">
             <code>{`import { Vaso } from 'vaso'`}</code>
           </pre>
         </div>
@@ -161,29 +161,29 @@ function IconGridDemo() {
             <div className="w-full h-full bg-transparent relative" style={{ width: vasoWidth, height: vasoHeight }}>
               {/* Right-side draggable bar */}
               <div
-                className={`absolute left-[20px] top-1/2 -translate-y-1/2 w-[calc(100%-40px)] h-8 bg-theme-text-bg-sample-text/30 rounded-full transition-all duration-80 ease-out hover:scale-x-150 hover:brightness-150 ${
+                className={`absolute left-[20px] top-1/2 -translate-y-1/2 w-[calc(100%-40px)] h-full bg-theme-text-bg-sample-text/30 rounded-full transition-all duration-80 ease-out hover:scale-x-150 hover:brightness-150 ${
                   isDragging ? 'cursor-grabbing scale-x-150 brightness-150' : 'cursor-ew-resize'
                 }`}
-                onMouseDown={(e) => {
+                onPointerDown={(e) => {
                   setIsDragging(true)
                   const startX = e.clientX
                   const startWidth = vasoWidth
 
-                  const handleMouseMove = (e: MouseEvent) => {
+                  const handlePointerMove = (e: PointerEvent) => {
                     const deltaX = e.clientX - startX
                     // 1:1 movement - cursor moves same distance as width change
-                    const newWidth = Math.max(30, Math.min(320 + 40, startWidth + deltaX))
+                    const newWidth = Math.max(60, Math.min(320 + 40, startWidth + deltaX))
                     setVasoWidth(newWidth)
                   }
 
-                  const handleMouseUp = () => {
+                  const handlePointerUp = () => {
                     setIsDragging(false)
-                    document.removeEventListener('pointermove', handleMouseMove)
-                    document.removeEventListener('pointerup', handleMouseUp)
+                    document.removeEventListener('pointermove', handlePointerMove)
+                    document.removeEventListener('pointerup', handlePointerUp)
                   }
 
-                  document.addEventListener('pointermove', handleMouseMove)
-                  document.addEventListener('pointerup', handleMouseUp)
+                  document.addEventListener('pointermove', handlePointerMove)
+                  document.addEventListener('pointerup', handlePointerUp)
                 }}
               />
             </div>
@@ -541,24 +541,26 @@ export default function Page() {
             <section className="relative border-b pb-4 theme-section">
               <h2 className="text-lg font-semibold mb-4 theme-heading">Play</h2>
               <div className="mt-2 relative border-t border-[var(--theme-border-color)] py-4">
-                {/* Row with two examples and divider */}
-                {/* Row 1 */}
-                <div className="relative grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+                {/* 2x2 Grid Layout */}
+                <div className="grid grid-cols-2 gap-4 md:gap-8">
                   {/* Theme Switcher Example */}
-                  <ThemeSwitcherDemo theme={theme} setTheme={setTheme} />
-
-                  {/* Vertical Divider (hidden on mobile) */}
-                  <div className="hidden md:block absolute left-1/2 top-0 bottom-0 w-px theme-divider transform -translate-x-1/2"></div>
+                  <div className="flex flex-col items-start">
+                    <ThemeSwitcherDemo theme={theme} setTheme={setTheme} />
+                  </div>
 
                   {/* Icon Grid with Vaso Control Example */}
-                  <div className="flex flex-col items-start px-4">
+                  <div className="flex flex-col items-start">
                     <IconGridDemo />
                   </div>
+
+                  {/* Water Flow Demo - spans 2 columns */}
+                  <div className="col-span-2 flex justify-center pt-4 border-t border-[var(--theme-border-color)]">
+                    <WaterFlowDemo />
+                  </div>
+
+                  {/* Empty fourth cell for potential future content */}
+                  <div className="hidden"></div>
                 </div>
-              </div>
-              {/* Row 2 */}
-              <div className="mt-2 border-t border-[var(--theme-border-color)] pt-8 pb-4">
-                <WaterFlowDemo />
               </div>
             </section>
 
@@ -626,7 +628,9 @@ export default function Page() {
                 </CodeGlass>
                 <span className="theme-text">{' • '}</span>
                 <HoverCodeGlass px={4} py={2} dispersion={0} radius={16}>
-                  <span className="font-bold p-1 rounded-md theme-author">MIT</span>
+                  <a href="https://github.com/huozhi/vaso" className="font-bold underline theme-link">
+                    <span className="font-bold p-1 rounded-md theme-author">X</span>
+                  </a>
                 </HoverCodeGlass>
 
                 {/* github link */}

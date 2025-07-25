@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useId, useRef, useState, useCallback } from 'react'
+import React, { useEffect, useId, useRef, useState, useCallback, useLayoutEffect } from 'react'
 
 const distortionIntensity = 0.15
 const roundness = 0.6
@@ -362,7 +362,7 @@ const Vaso: React.FC<VasoProps> = ({
   ])
 
   // Update effect when any prop changes
-  useEffect(() => {
+  useLayoutEffect(() => {
     scheduleUpdate()
   }, [scheduleUpdate])
 
@@ -482,7 +482,7 @@ const Vaso: React.FC<VasoProps> = ({
   }, [])
 
   // Update initial position when it's mounted - use a simpler, more reliable approach
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (wrapperRef.current) {
       const rect = wrapperRef.current.getBoundingClientRect()
       setPosition({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 })

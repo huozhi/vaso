@@ -7,12 +7,14 @@ import { Vaso, VasoProps } from "../../src"
 
 type HoverCodeGlassProps = VasoProps<HTMLSpanElement>
 
+const isTouchScreen = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0)
+
 export function HoverCodeGlass({ 
   children, 
   ...props 
 }: HoverCodeGlassProps) {
-  const [isHovered, setIsHovered] = useState(false)
-  const [currentBlur, setCurrentBlur] = useState(4)
+  const [isHovered, setIsHovered] = useState(isTouchScreen ? true : false)
+  const [currentBlur, setCurrentBlur] = useState(isTouchScreen ? 0 : 4)
 
   useSpring({
     blur: isHovered ? 0 : 4,

@@ -7,6 +7,10 @@ html, body {
   touch-action: pan-y;
 }
 
+::-webkit-scrollbar {
+  display: none;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
