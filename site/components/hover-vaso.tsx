@@ -1,20 +1,26 @@
 'use client'
 
-import React from 'react'
+import React, { useEffect } from 'react'
 import { useState } from 'react'
 import { useSpring } from '@react-spring/web'
 import { Vaso, VasoProps } from "../../src"
 
 type HoverCodeGlassProps = VasoProps<HTMLSpanElement>
 
-const isTouchScreen = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0)
-
 export function HoverCodeGlass({ 
   children, 
   ...props 
 }: HoverCodeGlassProps) {
-  const [isHovered, setIsHovered] = useState(isTouchScreen ? true : false)
-  const [currentBlur, setCurrentBlur] = useState(isTouchScreen ? 0 : 4)
+  const [isTouching, setIsTouching] = useState(true)
+  const [isHovered, setIsHovered] = useState(isTouching ? true : false)
+  const [currentBlur, setCurrentBlur] = useState(isTouching ? 0 : 4)
+
+  useEffect(() => {
+    const isTouchingDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+    setIsTouching(isTouchingDevice)    
+    setIsHovered(isTouchingDevice ? true : false)
+    setCurrentBlur(isTouchingDevice ? 0 : 4)
+  }, [])
 
   useSpring({
     blur: isHovered ? 0 : 4,
