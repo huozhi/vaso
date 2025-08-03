@@ -72,10 +72,6 @@ export type VasoProps<Element extends HTMLElement = HTMLDivElement> = React.HTML
    */
   dispersion?: number | false
 
-  /** Makes the glass element draggable with mouse/touch
-   * @default false
-   */
-  draggable?: boolean
 }
 
 // Smooth interpolation (used for fade effects near the edge)
@@ -213,7 +209,6 @@ const Vaso: React.FC<VasoProps> = ({
   depth = 0,
   blur = 0.1,
   dispersion = 0.5,
-  draggable = false,
   ...htmlProps
 }) => {
   const uid = useId()
@@ -224,21 +219,6 @@ const Vaso: React.FC<VasoProps> = ({
   const feDisplacementMapRef = useRef<SVGFEDisplacementMapElement>(null)
   const animationFrameRef = useRef<number | null>(null)
 
-  // Dragging state
-  const [isDragging, setIsDragging] = useState(false)
-  const [position, setPosition] = useState({ x: 0, y: 0 })
-  const dragStartRef = useRef({ mouse: { x: 0, y: 0 }, position: { x: 0, y: 0 } })
-
-  // Smooth movement with requestAnimationFrame
-  const smoothUpdatePosition = useCallback((newPosition: { x: number; y: number }) => {
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current)
-    }
-
-    animationFrameRef.current = rAF(() => {
-      setPosition(newPosition)
-    })
-  }, [])
 
   // Optimized update function with requestAnimationFrame
   const updateEffectRef = useRef<number | null>(null)
@@ -260,28 +240,10 @@ const Vaso: React.FC<VasoProps> = ({
       }
 
       // Get dimensions from props or the target element
-      let rect: DOMRect
-      if (draggable) {
-        const childElement = targetEl.firstElementChild as HTMLElement
-        if (!childElement) return
-
-        rect = {
-          width: width || childElement.offsetWidth || 200,
-          height: height || childElement.offsetHeight || 200,
-          left: 0,
-          top: 0,
-          right: 0,
-          bottom: 0,
-          x: 0,
-          y: 0,
-          toJSON: () => ({}),
-        } as DOMRect
-      } else {
-        rect = targetEl.getBoundingClientRect()
-        // Override with explicit width/height if provided
-        if (width !== undefined) rect.width = width
-        if (height !== undefined) rect.height = height
-      }
+      const rect = targetEl.getBoundingClientRect()
+      // Override with explicit width/height if provided
+      if (width !== undefined) rect.width = width
+      if (height !== undefined) rect.height = height
 
       const finalWidth = Math.max(1, rect.width + 2 * px)
       const finalHeight = Math.max(1, rect.height + 2 * py)
@@ -356,8 +318,6 @@ const Vaso: React.FC<VasoProps> = ({
     roundness,
     shapeWidth,
     shapeHeight,
-    position,
-    draggable,
     uid,
   ])
 
@@ -366,105 +326,7 @@ const Vaso: React.FC<VasoProps> = ({
     scheduleUpdate()
   }, [scheduleUpdate])
 
-  // Draggable elements need to recalculate position on scroll/resize
-  const scrollRafRef = useRef<number | null>(null)
 
-  useEffect(() => {
-    // Non-draggable elements use relative positioning and don't need repositioning
-    return () => {
-      if (scrollRafRef.current) {
-        cancelAnimationFrame(scrollRafRef.current)
-      }
-    }
-  }, [])
-
-  // Mouse event handlers for dragging
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      if (!draggable) return
-
-      // @ts-expect-error: dynamic ref assignment, improve this ref type later
-      htmlProps.onMouseDown?.(e)
-
-      setIsDragging(true)
-      dragStartRef.current = {
-        mouse: { x: e.clientX, y: e.clientY },
-        position: { x: position.x, y: position.y },
-      }
-    },
-    [draggable, position, htmlProps]
-  )
-
-  const handleMouseMove = useCallback(
-    (e: MouseEvent) => {
-      if (!isDragging || !draggable) return
-
-      const newPosition = {
-        x: dragStartRef.current.position.x + (e.clientX - dragStartRef.current.mouse.x),
-        y: dragStartRef.current.position.y + (e.clientY - dragStartRef.current.mouse.y),
-      }
-      smoothUpdatePosition(newPosition)
-    },
-    [isDragging, draggable, smoothUpdatePosition]
-  )
-
-  const handleMouseUp = useCallback(() => {
-    setIsDragging(false)
-  }, [])
-
-  // Touch event handlers for mobile
-  const handleTouchStart = useCallback(
-    (e: React.TouchEvent) => {
-      if (!draggable) return
-
-      // @ts-expect-error: dynamic ref assignment, improve this ref type later
-      htmlProps.onTouchStart?.(e)
-
-      const touch = e.touches[0]
-      setIsDragging(true)
-      dragStartRef.current = {
-        mouse: { x: touch.clientX, y: touch.clientY },
-        position: { x: position.x, y: position.y },
-      }
-    },
-    [draggable, position, htmlProps]
-  )
-
-  const handleTouchMove = useCallback(
-    (e: TouchEvent) => {
-      if (!isDragging || !draggable) return
-
-      e.preventDefault()
-      const touch = e.touches[0]
-      const newPosition = {
-        x: dragStartRef.current.position.x + (touch.clientX - dragStartRef.current.mouse.x),
-        y: dragStartRef.current.position.y + (touch.clientY - dragStartRef.current.mouse.y),
-      }
-      smoothUpdatePosition(newPosition)
-    },
-    [isDragging, draggable, smoothUpdatePosition]
-  )
-
-  const handleTouchEnd = useCallback(() => {
-    setIsDragging(false)
-  }, [])
-
-  // Add global event listeners for dragging
-  useEffect(() => {
-    if (draggable) {
-      document.addEventListener('mousemove', handleMouseMove)
-      document.addEventListener('mouseup', handleMouseUp)
-      document.addEventListener('touchmove', handleTouchMove, { passive: false })
-      document.addEventListener('touchend', handleTouchEnd)
-
-      return () => {
-        document.removeEventListener('mousemove', handleMouseMove)
-        document.removeEventListener('mouseup', handleMouseUp)
-        document.removeEventListener('touchmove', handleTouchMove)
-        document.removeEventListener('touchend', handleTouchEnd)
-      }
-    }
-  }, [draggable, handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd])
 
   // Cleanup timeouts and animation frames on unmount
   useEffect(() => {
@@ -475,19 +337,9 @@ const Vaso: React.FC<VasoProps> = ({
       if (updateEffectRef.current) {
         cancelAnimationFrame(updateEffectRef.current)
       }
-      if (scrollRafRef.current) {
-        cancelAnimationFrame(scrollRafRef.current)
-      }
     }
   }, [])
 
-  // Update initial position when it's mounted - use a simpler, more reliable approach
-  useLayoutEffect(() => {
-    if (wrapperRef.current) {
-      const rect = wrapperRef.current.getBoundingClientRect()
-      setPosition({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 })
-    }
-  }, [])
 
   return (
     <WrapComponent
@@ -496,30 +348,23 @@ const Vaso: React.FC<VasoProps> = ({
       // @ts-expect-error: dynamic ref assignment, improve this ref type later
       ref={wrapperRef}
     >
-      {draggable && position.x !== 0 && position.y !== 0 && (
-        <div style={{ position: 'absolute', visibility: 'hidden', pointerEvents: 'none' }} />
-      )}
 
       <WrapComponent
         data-vaso={uid}
         // @ts-expect-error: dynamic ref assignment, improve this ref type later
         ref={containerRef}
-        onMouseDown={handleMouseDown}
-        onTouchStart={handleTouchStart}
         style={{
-          position: draggable ? 'fixed' : 'absolute',
-          top: draggable ? position.y - ((height || 0) + py * 2) / 2 : -py,
-          left: draggable ? position.x - ((width || 0) + px * 2) / 2 : -px,
-          width: draggable ? (width || 0) + px * 2 : `calc(100% + ${px * 2}px)`,
-          height: draggable ? (height || 0) + py * 2 : `calc(100% + ${py * 2}px)`,
+          position: 'absolute',
+          top: -py,
+          left: -px,
+          width: `calc(100% + ${px * 2}px)`,
+          height: `calc(100% + ${py * 2}px)`,
           overflow: 'hidden',
           backdropFilter: createBackdropFilter(uid, blur),
-          ...(draggable && { zIndex: htmlProps.style?.zIndex || 999 }),
           ...(radius && { borderRadius: radius }),
-          cursor: draggable ? (isDragging ? 'grabbing' : 'grab') : 'default',
+          cursor: 'default',
           userSelect: 'none',
-          transition: isDragging ? 'none' : 'transform 0.1s ease-out',
-          pointerEvents: draggable ? 'auto' : 'none',
+          pointerEvents: 'none',
         }}
       />
 

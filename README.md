@@ -48,7 +48,6 @@ function App() {
 | `py` | `number` | `0` | `0-100` | Vertical padding around the glass effect |
 | `radius` | `number` | `0` | `0-∞` | Border radius of the glass container |
 | `depth` | `number` | `0.4` | `-2.0 to 2.0` | Distortion scale intensity (negative values create compression) |
-| `draggable` | `boolean` | `false` | - | Whether the glass can be dragged around |
 
 ### Negative Values Support
 
@@ -87,24 +86,6 @@ Vaso supports negative values for several parameters to create inverted effects:
 />
 ```
 
-### Draggable Glass with Callbacks
-
-```tsx
-function DraggableGlass() {
-  const [position, setPosition] = useState({ x: 100, y: 100 })
-  
-  return (
-    <Vaso
-      draggable
-      px={15}
-      py={15}
-      radius={20}
-      depth={1.2}
-      blur={0.4}
-    />
-  )
-}
-```
 
 ### High Distortion Effect
 

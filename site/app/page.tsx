@@ -451,7 +451,6 @@ function WaterFlowDemo() {
         <div className="absolute top-1/3 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-50 h-12 overflow-hidden">
           {/* Vaso Glass Effect (only over island) */}
           <Vaso
-            draggable={false}
             radius={20}
             depth={factor * 2}
             blur={factor * 1.2}

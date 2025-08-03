@@ -110,7 +110,7 @@
 
 /* Light Theme (Default) */
 .root {
-  background-color: #e0e5e1;
+  background-color: rgb(245 244 237);
 }
 
 .theme-title {
@@ -144,7 +144,7 @@
 }
 
 .theme-content {
-  background-color: #dbdcd7;
+  background-color: #f4f1e7;
   transition: background-color 500ms ease;
 }
 
@@ -258,7 +258,7 @@
 }
 
 .theme-text-bg {
-  background-color: #cccfc1;
+  background-color: #e2dfd2;
 }
 
 [data-theme="dark"] .theme-text-bg {
