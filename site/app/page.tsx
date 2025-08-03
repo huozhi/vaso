@@ -502,14 +502,14 @@ function WaterFlowDemo() {
 
       {/* Toggle Control */}
       <div className="flex items-center justify-center gap-4 w-64 rounded-xl">
-        <span className="text-sm font-medium theme-controls-title">Frosted</span>
+        <span className="text-sm font-medium theme-controls-title mr-4">Frosted</span>
         <button
           onClick={() => setFrostedGlass(!frostedGlass)}
           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-            frostedGlass ? 'bg-[#7b7e68]' : 'bg-[#bcbeb3]'
+            frostedGlass ? 'bg-[#e3a75a]' : 'bg-[#bcbeb3]'
           }`}
         >
-          <span className="absolute top-1/2 left-0 -translate-y-[50%] w-[56px] h-[36px]">
+          <span className="absolute top-1/2 left-1/2 -translate-y-[50%] -translate-x-1/2 w-[56px] h-[36px]">
             <Vaso
               width={56}
               height={36}
@@ -518,7 +518,7 @@ function WaterFlowDemo() {
               dispersion={0}
               blur={0.3}
               className={`transform transition-transform translate-y-1/2 ${
-                frostedGlass ? 'translate-x-4' : '-translate-x-[6px]'
+                frostedGlass ? 'translate-x-4' : '-translate-x-4'
               }`}
             />
           </span>
