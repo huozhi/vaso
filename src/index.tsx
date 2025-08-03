@@ -344,11 +344,10 @@ const Vaso: React.FC<VasoProps> = ({
   return (
     <WrapComponent
       {...htmlProps}
-      style={{ position: 'relative', ...htmlProps.style }}
+      style={{ position: 'relative' }}
       // @ts-expect-error: dynamic ref assignment, improve this ref type later
       ref={wrapperRef}
     >
-
       <WrapComponent
         data-vaso={uid}
         // @ts-expect-error: dynamic ref assignment, improve this ref type later

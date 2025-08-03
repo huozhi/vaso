@@ -4,7 +4,7 @@ import { Vaso, type VasoProps } from '../../src'
 import { Switcher } from './switcher'
 import { HoverCodeGlass } from '../components/hover-vaso'
 import { useGlassContext } from '../contexts/glass-context'
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState, useEffect, useCallback } from 'react'
 
 import './page.css'
 import { useSpring } from '@react-spring/web'
@@ -65,17 +65,15 @@ function BrowserWarning() {
                 </svg>
               </div>
             </div>
-            
+
             {/* Content */}
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Vaso</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-300 mt-0.5">
-                    Browser not fully supported
-                  </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mt-0.5">Browser not fully supported</p>
                 </div>
-                
+
                 {/* Close button */}
                 <button
                   onClick={() => setShowWarning(false)}
@@ -313,7 +311,7 @@ function VasoSlider({
 function GlassControls() {
   const { settings, updateSettings } = useGlassContext()
   return (
-    <div className="sticky top-12 right-4 z-10 rounded-xl shadow-[0_35px_30px_-15px_rgba(0,0,0,0.2),0_10px_10px_-5px_rgba(0,0,0,0.3),0_10px_10px_-5px_rgba(0,0,0,0.2)] overflow-hidden mx-auto w-fit">
+    <div className="sticky top-12 right-4 lg:translate-x-[80%] z-10 rounded-xl shadow-[0_35px_30px_-15px_rgba(0,0,0,0.2),0_10px_10px_-5px_rgba(0,0,0,0.3),0_10px_10px_-5px_rgba(0,0,0,0.2)] overflow-hidden ml-auto w-fit">
       <div className="backdrop-blur-sm px-4 py-3 mobile-controls theme-controls w-[320px] sm:w-[280px] lg:w-[320px]">
         <p className="text-sm font-medium mb-3 theme-controls-title">Glass Attributes</p>
         <div className="grid grid-cols-2 gap-3 text-xs mobile-controls-grid theme-controls-text">
@@ -418,9 +416,9 @@ function ThemeSwitcherDemo({ theme, setTheme }: { theme: string; setTheme: (them
   )
 }
 
-const bgUrl = 'https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExZG1wZWU5azNrYmV3NXJ1enplbDFoMXR2ZXV5MWE2bm5yMnU1MHhrdyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/EzUMaltmsbK3G1Y5Ow/giphy.gif'
-
 function WaterFlowDemo() {
+  const bgUrl =
+    'https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExZG1wZWU5azNrYmV3NXJ1enplbDFoMXR2ZXV5MWE2bm5yMnU1MHhrdyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/EzUMaltmsbK3G1Y5Ow/giphy.gif'
   const [frostedGlass, setFrostedGlass] = useState(false)
   const [factor, setFactor] = useState(0.5)
   useSpring({
@@ -433,7 +431,7 @@ function WaterFlowDemo() {
     easing: 'easeInOutCubic',
     onChange: ({ value }) => {
       setFactor(value.factor)
-    }
+    },
   })
   return (
     <div className="flex flex-col items-center gap-6">
@@ -456,8 +454,7 @@ function WaterFlowDemo() {
             blur={factor * 1.2}
             dispersion={factor * 0.1}
             className="top-0 left-0 w-full h-full rounded-full overflow-hidden"
-          >
-          </Vaso>
+          ></Vaso>
 
           {/* Icons (always on top) */}
           <div className="absolute inset-0 flex items-center justify-between rounded-full text-[#fff]">
@@ -523,6 +520,170 @@ function WaterFlowDemo() {
   )
 }
 
+function DraggableGlassDemo() {
+  const [isDragging, setIsDragging] = useState(false)
+  const [position, setPosition] = useState({ x: 150, y: 100 })
+  const dragStartRef = useRef({ mouse: { x: 0, y: 0 }, position: { x: 0, y: 0 } })
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  const glassSize = 120
+  const overflowGap = 24
+
+  // Handle mouse down
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault()
+      setIsDragging(true)
+      dragStartRef.current = {
+        mouse: { x: e.clientX, y: e.clientY },
+        position: { x: position.x, y: position.y },
+      }
+    },
+    [position]
+  )
+
+  // Handle mouse move
+  const handleMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (!isDragging) return
+
+      const newPosition = {
+        x: dragStartRef.current.position.x + (e.clientX - dragStartRef.current.mouse.x),
+        y: dragStartRef.current.position.y + (e.clientY - dragStartRef.current.mouse.y),
+      }
+
+      // Constrain to container bounds
+      const containerRect = containerRef.current?.getBoundingClientRect()
+      newPosition.x = Math.max(
+        glassSize / 2 - overflowGap,
+        Math.min(containerRect.width - glassSize / 2 + overflowGap, newPosition.x)
+      )
+      newPosition.y = Math.max(
+        glassSize / 2 - overflowGap,
+        Math.min(containerRect.height - glassSize / 2 + overflowGap, newPosition.y)
+      )
+
+      setPosition(newPosition)
+    },
+    [isDragging]
+  )
+
+  // Handle mouse up
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false)
+  }, [])
+
+  // Touch handlers for mobile
+  const handleTouchStart = useCallback(
+    (e: React.TouchEvent) => {
+      e.preventDefault()
+      const touch = e.touches[0]
+      setIsDragging(true)
+      dragStartRef.current = {
+        mouse: { x: touch.clientX, y: touch.clientY },
+        position: { x: position.x, y: position.y },
+      }
+    },
+    [position]
+  )
+
+  const handleTouchMove = useCallback(
+    (e: TouchEvent) => {
+      if (!isDragging) return
+
+      e.preventDefault()
+      const touch = e.touches[0]
+      const newPosition = {
+        x: dragStartRef.current.position.x + (touch.clientX - dragStartRef.current.mouse.x),
+        y: dragStartRef.current.position.y + (touch.clientY - dragStartRef.current.mouse.y),
+      }
+
+      // Constrain to container bounds
+      const containerRect = containerRef.current?.getBoundingClientRect()
+
+      newPosition.x = Math.max(
+        glassSize / 2 - overflowGap,
+        Math.min(containerRect.width - glassSize / 2 + overflowGap, newPosition.x)
+      )
+      newPosition.y = Math.max(
+        glassSize / 2 - overflowGap,
+        Math.min(containerRect.height - glassSize / 2 + overflowGap, newPosition.y)
+      )
+
+      setPosition(newPosition)
+    },
+    [isDragging]
+  )
+
+  const handleTouchEnd = useCallback(() => {
+    setIsDragging(false)
+  }, [])
+
+  // Add global event listeners
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
+      document.addEventListener('touchmove', handleTouchMove, { passive: false })
+      document.addEventListener('touchend', handleTouchEnd)
+
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove)
+        document.removeEventListener('mouseup', handleMouseUp)
+        document.removeEventListener('touchmove', handleTouchMove)
+        document.removeEventListener('touchend', handleTouchEnd)
+      }
+    }
+  }, [isDragging, handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd])
+
+  return (
+    <div className="flex flex-col items-center gap-4">
+      {/* Canvas container */}
+      <div className="relative w-[360px] h-[240px] p-8" ref={containerRef}>
+        {/* Background image */}
+        <div
+          className="relative w-full h-full bg-center rounded-3xl"
+          style={{
+            backgroundImage: `url(/flower.jpg)`,
+          }}
+        >
+          {/* Instruction overlay */}
+          <div className="absolute select-none top-4 left-4 bg-black/20 backdrop-blur-sm rounded-lg px-3 py-2">
+            <p className="text-xs text-white/90 font-medium">Drag the glass around</p>
+          </div>
+        </div>
+
+        {/* Draggable glass element */}
+        <div
+          className="absolute"
+          style={{
+            left: position.x - glassSize / 2, // Center the 80px circle
+            top: position.y - glassSize / 2,
+            width: glassSize,
+            height: glassSize,
+            cursor: isDragging ? 'grabbing' : 'grab',
+            userSelect: 'none',
+            transition: isDragging ? 'none' : 'transform 0.1s ease-out',
+          }}
+          onMouseDown={handleMouseDown}
+          onTouchStart={handleTouchStart}
+        >
+          <Vaso
+            width={glassSize}
+            height={glassSize}
+            radius={glassSize / 2}
+            depth={3}
+            blur={0.2}
+            className="w-full h-full"
+          >
+            <div className="w-full h-full rounded-full bg-transparent" />
+          </Vaso>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Page() {
   const [theme, setTheme] = useState('light')
 
@@ -569,13 +730,18 @@ export default function Page() {
                     <IconGridDemo />
                   </div>
 
-                  {/* Water Flow Demo - spans 2 columns */}
-                  <div className="col-span-2 flex justify-center pt-4 border-t border-[var(--theme-border-color)]">
-                    <WaterFlowDemo />
-                  </div>
+                  {/* Draggable Glass Demo */}
 
-                  {/* Empty fourth cell for potential future content */}
-                  <div className="hidden"></div>
+                  {/* Water Flow Demo - spans 2 columns */}
+                  <div className="col-span-2 flex flex-col justify-center pt-4 border-t border-[var(--theme-border-color)]">
+                    <div className="col-span-2 flex justify-center mb-12">
+                      <DraggableGlassDemo />
+                    </div>
+
+                    <div className="col-span-2 flex justify-center">
+                      <WaterFlowDemo />
+                    </div>
+                  </div>
                 </div>
               </div>
             </section>
