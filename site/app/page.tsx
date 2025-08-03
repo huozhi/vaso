@@ -311,7 +311,7 @@ function VasoSlider({
 function GlassControls() {
   const { settings, updateSettings } = useGlassContext()
   return (
-    <div className="sticky top-12 right-4 lg:translate-x-[80%] z-10 rounded-xl shadow-[0_35px_30px_-15px_rgba(0,0,0,0.2),0_10px_10px_-5px_rgba(0,0,0,0.3),0_10px_10px_-5px_rgba(0,0,0,0.2)] overflow-hidden ml-auto w-fit">
+    <div className="fixed top-4 right-4 z-50 rounded-xl shadow-[0_35px_30px_-15px_rgba(0,0,0,0.2),0_10px_10px_-5px_rgba(0,0,0,0.3),0_10px_10px_-5px_rgba(0,0,0,0.2)] overflow-hidden">
       <div className="backdrop-blur-sm px-4 py-3 mobile-controls theme-controls w-[320px] sm:w-[280px] lg:w-[320px]">
         <p className="text-sm font-medium mb-3 theme-controls-title">Glass Attributes</p>
         <div className="grid grid-cols-2 gap-3 text-xs mobile-controls-grid theme-controls-text">
@@ -509,11 +509,19 @@ function WaterFlowDemo() {
             frostedGlass ? 'bg-[#7b7e68]' : 'bg-[#bcbeb3]'
           }`}
         >
-          <span
-            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-              frostedGlass ? 'translate-x-6' : 'translate-x-1'
-            }`}
-          />
+          <span className="absolute top-1/2 left-0 -translate-y-[50%] w-[56px] h-[36px]">
+            <Vaso
+              width={56}
+              height={36}
+              radius={20}
+              depth={frostedGlass ? 2 : 0.5}
+              dispersion={0}
+              blur={0.3}
+              className={`transform transition-transform translate-y-1/2 ${
+                frostedGlass ? 'translate-x-4' : '-translate-x-[6px]'
+              }`}
+            />
+          </span>
         </button>
       </div>
     </div>
@@ -522,7 +530,7 @@ function WaterFlowDemo() {
 
 function DraggableGlassDemo() {
   const [isDragging, setIsDragging] = useState(false)
-  const [position, setPosition] = useState({ x: 150, y: 100 })
+  const [position, setPosition] = useState({ x: 100, y: 60 })
   const dragStartRef = useRef({ mouse: { x: 0, y: 0 }, position: { x: 0, y: 0 } })
   const containerRef = useRef<HTMLDivElement>(null)
 
