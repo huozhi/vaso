@@ -1,6 +1,6 @@
 {
   "name": "vaso",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Glass effect for React",
   "type": "module",
   "main": "./dist/index.js",
