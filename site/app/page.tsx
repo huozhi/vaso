@@ -531,8 +531,11 @@ function WaterFlowDemo() {
 function DraggableGlassDemo() {
   const [isDragging, setIsDragging] = useState(false)
   const [position, setPosition] = useState({ x: 100, y: 60 })
+  const [glassIntensity, setGlassIntensity] = useState(0.5)
   const dragStartRef = useRef({ mouse: { x: 0, y: 0 }, position: { x: 0, y: 0 } })
   const containerRef = useRef<HTMLDivElement>(null)
+  const sliderRef = useRef<HTMLDivElement>(null)
+  const [sliderDragging, setSliderDragging] = useState(false)
 
   const glassSize = 120
   const overflowGap = 24
@@ -627,6 +630,34 @@ function DraggableGlassDemo() {
     setIsDragging(false)
   }, [])
 
+  // Slider handlers
+  const handleSliderMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setSliderDragging(true)
+    updateSliderValue(e)
+  }, [])
+
+  const handleSliderMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (!sliderDragging) return
+      updateSliderValue(e)
+    },
+    [sliderDragging]
+  )
+
+  const handleSliderMouseUp = useCallback(() => {
+    setSliderDragging(false)
+  }, [])
+
+  const updateSliderValue = useCallback((e: MouseEvent | React.MouseEvent) => {
+    if (!sliderRef.current) return
+    const rect = sliderRef.current.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const percentage = Math.max(0, Math.min(1, x / rect.width))
+    setGlassIntensity(percentage)
+  }, [])
+
   // Add global event listeners
   useEffect(() => {
     if (isDragging) {
@@ -643,6 +674,19 @@ function DraggableGlassDemo() {
       }
     }
   }, [isDragging, handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd])
+
+  // Slider event listeners
+  useEffect(() => {
+    if (sliderDragging) {
+      document.addEventListener('mousemove', handleSliderMouseMove)
+      document.addEventListener('mouseup', handleSliderMouseUp)
+
+      return () => {
+        document.removeEventListener('mousemove', handleSliderMouseMove)
+        document.removeEventListener('mouseup', handleSliderMouseUp)
+      }
+    }
+  }, [sliderDragging, handleSliderMouseMove, handleSliderMouseUp])
 
   return (
     <div className="flex flex-col items-center gap-4">
@@ -680,12 +724,51 @@ function DraggableGlassDemo() {
             width={glassSize}
             height={glassSize}
             radius={glassSize / 2}
-            depth={3}
-            blur={0.2}
+            depth={1 + glassIntensity * 3}
+            blur={0.1 + glassIntensity * 0.3}
+            dispersion={glassIntensity * 0.8}
             className="w-full h-full"
           >
             <div className="w-full h-full rounded-full bg-transparent" />
           </Vaso>
+        </div>
+      </div>
+
+      {/* Glass Intensity Slider Control */}
+      <div className="flex items-center justify-center gap-4 w-64 rounded-xl">
+        <span className="text-sm font-medium theme-controls-title">Depth</span>
+        <div className="relative w-48 h-6 flex items-center">
+          <div
+            ref={sliderRef}
+            className="relative w-full h-2 bg-[#bcbeb3] rounded-full cursor-pointer"
+            onMouseDown={handleSliderMouseDown}
+          >
+            {/* Slider track */}
+            <div
+              className="absolute h-2 bg-[#e3a75a] rounded-full transition-all overflow-hidden"
+              style={{ width: `${glassIntensity * 100}%` }}
+            />
+            
+            {/* Vaso slider thumb */}
+            <div
+              className="absolute top-1/2 -translate-y-1/2 w-[36px] h-[24px]"
+              style={{
+                left: `calc(${glassIntensity * 100}% - 18px)`
+              }}
+            >
+              <Vaso
+                width={36}
+                height={24}
+                radius={12}
+                depth={1 + glassIntensity * 2}
+                dispersion={0}
+                blur={0.3}
+                className="w-full h-full"
+              >
+                <div className="w-full h-full rounded-full bg-white/20" />
+              </Vaso>
+            </div>
+          </div>
         </div>
       </div>
     </div>
