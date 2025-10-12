@@ -9,6 +9,7 @@
     "dist"
   ],
   "scripts": {
+    "dev": "pnpm next site",
     "build": "rm -rf dist && bunchee",
     "prepublishOnly": "pnpm build"
   },

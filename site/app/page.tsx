@@ -4,7 +4,7 @@ import { Vaso, type VasoProps } from '../../src'
 import { Switcher } from './switcher'
 import { HoverCodeGlass } from '../components/hover-vaso'
 import { useGlassContext } from '../contexts/glass-context'
-import { useRef, useState, useEffect, useCallback } from 'react'
+import { useRef, useState, useEffect, useCallback, startTransition } from 'react'
 
 import './page.css'
 import { useSpring } from '@react-spring/web'
@@ -49,47 +49,25 @@ function BrowserWarning() {
   if (!showWarning) return null
 
   return (
-    <div className="sticky top-4 z-20 w-full mb-4 flex justify-center">
-      <div className="max-w-md w-full mx-4">
-        <div className="bg-white/20 backdrop-blur-xl rounded-2xl p-4 shadow-[0_8px_32px_rgba(0,0,0,0.1)] border border-white/10">
-          <div className="flex items-center gap-4">
-            {/* App Icon */}
-            <div className="flex-shrink-0">
-              <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-red-500 rounded-xl flex items-center justify-center shadow-lg">
-                <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path
-                    fillRule="evenodd"
-                    d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              </div>
-            </div>
+    <div className="fixed top-0 left-0 right-0 z-[9999] h-[30px]">
+      <div className="bg-yellow-100/80 backdrop-blur-xl h-full shadow-[0_8px_32px_rgba(0,0,0,0.1)] border-b border-yellow-200/50 px-4">
+        <div className="max-w-7xl mx-auto h-full flex items-center justify-between">
+          {/* Content */}
+          <p className="text-sm text-gray-700 dark:text-gray-800">Browser not fully supported</p>
 
-            {/* Content */}
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Vaso</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-300 mt-0.5">Browser not fully supported</p>
-                </div>
-
-                {/* Close button */}
-                <button
-                  onClick={() => setShowWarning(false)}
-                  className="ml-4 p-1.5 rounded-full bg-gray-200/50 hover:bg-gray-200/70 dark:bg-gray-700/50 dark:hover:bg-gray-700/70 transition-colors"
-                >
-                  <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                    <path
-                      fillRule="evenodd"
-                      d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          </div>
+          {/* Close button */}
+          <button
+            onClick={() => setShowWarning(false)}
+            className="ml-4 p-1.5 rounded-full bg-transparent dark:bg-gray-700/50 dark:hover:bg-gray-700/70 transition-colors"
+          >
+            <svg className="w-4 h-4 text-gray-500 dark:text-gray-700" fill="currentColor" viewBox="0 0 20 20">
+              <path
+                fillRule="evenodd"
+                d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </button>
         </div>
       </div>
     </div>
@@ -253,7 +231,8 @@ function VasoSlider({
             e.stopPropagation()
             setIsDragging(true)
 
-            // Capture the pointer for better tracking
+            // Capture the pointer to track movement even outside the thumb
+            // This allows smooth dragging without losing tracking if cursor moves fast
             const target = e.currentTarget
             target.setPointerCapture(e.pointerId)
 
@@ -269,11 +248,14 @@ function VasoSlider({
 
               // Round to nearest step
               const steppedValue = Math.round(newValue / step) * step
-              onChange(steppedValue)
+              startTransition(() => {
+                onChange(steppedValue)
+              })
             }
 
             const handlePointerUp = (e: PointerEvent) => {
               setIsDragging(false)
+              // Release pointer capture to end the drag interaction
               target.releasePointerCapture(e.pointerId)
               target.removeEventListener('pointermove', handlePointerMove)
               target.removeEventListener('pointerup', handlePointerUp)
@@ -529,42 +511,50 @@ function WaterFlowDemo() {
 }
 
 function DraggableGlassDemo() {
-  const [isDragging, setIsDragging] = useState(false)
   const [position, setPosition] = useState({ x: 100, y: 60 })
   const [glassIntensity, setGlassIntensity] = useState(0.5)
-  const dragStartRef = useRef({ mouse: { x: 0, y: 0 }, position: { x: 0, y: 0 } })
+  const dragStartRef = useRef({ pointer: { x: 0, y: 0 }, position: { x: 0, y: 0 } })
   const containerRef = useRef<HTMLDivElement>(null)
   const sliderRef = useRef<HTMLDivElement>(null)
-  const [sliderDragging, setSliderDragging] = useState(false)
 
   const glassSize = 120
   const overflowGap = 24
 
-  // Handle mouse down
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
+  // Glass drag handlers - all using React synthetic events
+  const handleGlassPointerDown = useCallback(
+    (e: React.PointerEvent) => {
       e.preventDefault()
-      setIsDragging(true)
+      const target = e.currentTarget as HTMLElement
+      
+      // Capture all pointer events to this element until released
+      // This ensures we continue receiving pointermove events even when
+      // the pointer moves outside the element boundaries (e.g. fast dragging)
+      // Without this, the drag would stop when cursor leaves the element
+      target.setPointerCapture(e.pointerId)
+      
+      // Store initial pointer position and element position for delta calculations
       dragStartRef.current = {
-        mouse: { x: e.clientX, y: e.clientY },
+        pointer: { x: e.clientX, y: e.clientY },
         position: { x: position.x, y: position.y },
       }
     },
     [position]
   )
 
-  // Handle mouse move
-  const handleMouseMove = useCallback(
-    (e: MouseEvent) => {
-      if (!isDragging) return
+  const handleGlassPointerMove = useCallback((e: React.PointerEvent) => {
+    // Only handle move events if we're actively capturing this pointer
+    // This prevents processing moves when not dragging
+    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return
 
-      const newPosition = {
-        x: dragStartRef.current.position.x + (e.clientX - dragStartRef.current.mouse.x),
-        y: dragStartRef.current.position.y + (e.clientY - dragStartRef.current.mouse.y),
-      }
+    // Calculate new position based on pointer movement delta
+    const newPosition = {
+      x: dragStartRef.current.position.x + (e.clientX - dragStartRef.current.pointer.x),
+      y: dragStartRef.current.position.y + (e.clientY - dragStartRef.current.pointer.y),
+    }
 
-      // Constrain to container bounds
-      const containerRect = containerRef.current?.getBoundingClientRect()
+    // Constrain to container bounds to keep glass visible
+    const containerRect = containerRef.current?.getBoundingClientRect()
+    if (containerRect) {
       newPosition.x = Math.max(
         glassSize / 2 - overflowGap,
         Math.min(containerRect.width - glassSize / 2 + overflowGap, newPosition.x)
@@ -573,120 +563,64 @@ function DraggableGlassDemo() {
         glassSize / 2 - overflowGap,
         Math.min(containerRect.height - glassSize / 2 + overflowGap, newPosition.y)
       )
+    }
 
+    // Wrap in startTransition to prioritize pointer responsiveness over visual updates
+    // This keeps the drag smooth even if re-rendering the Vaso effect is expensive
+    startTransition(() => {
       setPosition(newPosition)
-    },
-    [isDragging]
-  )
+    })
+  }, [glassSize, overflowGap])
 
-  // Handle mouse up
-  const handleMouseUp = useCallback(() => {
-    setIsDragging(false)
+  const handleGlassPointerUp = useCallback((e: React.PointerEvent) => {
+    const target = e.currentTarget as HTMLElement
+    if (target.hasPointerCapture(e.pointerId)) {
+      // Release the pointer capture to return to normal event handling
+      // After this, pointer events will only fire when over the element again
+      target.releasePointerCapture(e.pointerId)
+    }
   }, [])
 
-  // Touch handlers for mobile
-  const handleTouchStart = useCallback(
-    (e: React.TouchEvent) => {
-      e.preventDefault()
-      const touch = e.touches[0]
-      setIsDragging(true)
-      dragStartRef.current = {
-        mouse: { x: touch.clientX, y: touch.clientY },
-        position: { x: position.x, y: position.y },
-      }
-    },
-    [position]
-  )
-
-  const handleTouchMove = useCallback(
-    (e: TouchEvent) => {
-      if (!isDragging) return
-
-      e.preventDefault()
-      const touch = e.touches[0]
-      const newPosition = {
-        x: dragStartRef.current.position.x + (touch.clientX - dragStartRef.current.mouse.x),
-        y: dragStartRef.current.position.y + (touch.clientY - dragStartRef.current.mouse.y),
-      }
-
-      // Constrain to container bounds
-      const containerRect = containerRef.current?.getBoundingClientRect()
-
-      newPosition.x = Math.max(
-        glassSize / 2 - overflowGap,
-        Math.min(containerRect.width - glassSize / 2 + overflowGap, newPosition.x)
-      )
-      newPosition.y = Math.max(
-        glassSize / 2 - overflowGap,
-        Math.min(containerRect.height - glassSize / 2 + overflowGap, newPosition.y)
-      )
-
-      setPosition(newPosition)
-    },
-    [isDragging]
-  )
-
-  const handleTouchEnd = useCallback(() => {
-    setIsDragging(false)
-  }, [])
-
-  // Slider handlers
-  const handleSliderMouseDown = useCallback((e: React.MouseEvent) => {
+  // Slider handlers - all using React synthetic events
+  const handleSliderPointerDown = useCallback((e: React.PointerEvent) => {
     e.preventDefault()
-    e.stopPropagation()
-    setSliderDragging(true)
-    updateSliderValue(e)
-  }, [])
-
-  const handleSliderMouseMove = useCallback(
-    (e: MouseEvent) => {
-      if (!sliderDragging) return
-      updateSliderValue(e)
-    },
-    [sliderDragging]
-  )
-
-  const handleSliderMouseUp = useCallback(() => {
-    setSliderDragging(false)
-  }, [])
-
-  const updateSliderValue = useCallback((e: MouseEvent | React.MouseEvent) => {
+    e.stopPropagation() // Prevent this from triggering glass drag
+    
+    const target = e.currentTarget as HTMLElement
+    // Capture pointer so slider keeps responding even if pointer moves outside track
+    target.setPointerCapture(e.pointerId)
+    
+    // Calculate intensity from click/touch position on slider track
     if (!sliderRef.current) return
     const rect = sliderRef.current.getBoundingClientRect()
     const x = e.clientX - rect.left
     const percentage = Math.max(0, Math.min(1, x / rect.width))
-    setGlassIntensity(percentage)
+    startTransition(() => {
+      setGlassIntensity(percentage)
+    })
   }, [])
 
-  // Add global event listeners
-  useEffect(() => {
-    if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove)
-      document.addEventListener('mouseup', handleMouseUp)
-      document.addEventListener('touchmove', handleTouchMove, { passive: false })
-      document.addEventListener('touchend', handleTouchEnd)
+  const handleSliderPointerMove = useCallback((e: React.PointerEvent) => {
+    // Only update if we're actively dragging the slider
+    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return
+    
+    // Recalculate intensity based on current pointer position
+    if (!sliderRef.current) return
+    const rect = sliderRef.current.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const percentage = Math.max(0, Math.min(1, x / rect.width))
+    startTransition(() => {
+      setGlassIntensity(percentage)
+    })
+  }, [])
 
-      return () => {
-        document.removeEventListener('mousemove', handleMouseMove)
-        document.removeEventListener('mouseup', handleMouseUp)
-        document.removeEventListener('touchmove', handleTouchMove)
-        document.removeEventListener('touchend', handleTouchEnd)
-      }
+  const handleSliderPointerUp = useCallback((e: React.PointerEvent) => {
+    const target = e.currentTarget as HTMLElement
+    if (target.hasPointerCapture(e.pointerId)) {
+      // Release capture when done dragging slider
+      target.releasePointerCapture(e.pointerId)
     }
-  }, [isDragging, handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd])
-
-  // Slider event listeners
-  useEffect(() => {
-    if (sliderDragging) {
-      document.addEventListener('mousemove', handleSliderMouseMove)
-      document.addEventListener('mouseup', handleSliderMouseUp)
-
-      return () => {
-        document.removeEventListener('mousemove', handleSliderMouseMove)
-        document.removeEventListener('mouseup', handleSliderMouseUp)
-      }
-    }
-  }, [sliderDragging, handleSliderMouseMove, handleSliderMouseUp])
+  }, [])
 
   return (
     <div className="flex flex-col items-center gap-4">
@@ -709,16 +643,18 @@ function DraggableGlassDemo() {
         <div
           className="absolute"
           style={{
-            left: position.x - glassSize / 2, // Center the 80px circle
+            left: position.x - glassSize / 2,
             top: position.y - glassSize / 2,
             width: glassSize,
             height: glassSize,
-            cursor: isDragging ? 'grabbing' : 'grab',
+            cursor: 'grab',
             userSelect: 'none',
-            transition: isDragging ? 'none' : 'transform 0.1s ease-out',
+            touchAction: 'none',
           }}
-          onMouseDown={handleMouseDown}
-          onTouchStart={handleTouchStart}
+          onPointerDown={handleGlassPointerDown}
+          onPointerMove={handleGlassPointerMove}
+          onPointerUp={handleGlassPointerUp}
+          onPointerCancel={handleGlassPointerUp}
         >
           <Vaso
             width={glassSize}
@@ -741,11 +677,15 @@ function DraggableGlassDemo() {
           <div
             ref={sliderRef}
             className="relative w-full h-2 bg-[#bcbeb3] rounded-full cursor-pointer"
-            onMouseDown={handleSliderMouseDown}
+            style={{ touchAction: 'none' }}
+            onPointerDown={handleSliderPointerDown}
+            onPointerMove={handleSliderPointerMove}
+            onPointerUp={handleSliderPointerUp}
+            onPointerCancel={handleSliderPointerUp}
           >
             {/* Slider track */}
             <div
-              className="absolute h-2 bg-[#e3a75a] rounded-full transition-all overflow-hidden"
+              className="absolute h-2 bg-[#e3a75a] rounded-full overflow-hidden"
               style={{ width: `${glassIntensity * 100}%` }}
             />
             
