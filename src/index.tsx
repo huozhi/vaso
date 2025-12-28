@@ -363,6 +363,7 @@ const Vaso: React.FC<VasoProps> = ({
           ...(radius && { borderRadius: radius }),
           cursor: 'default',
           userSelect: 'none',
+          pointerEvents: 'none', // Allow clicks to pass through to content
         }}
       />
 
