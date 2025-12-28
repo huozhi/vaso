@@ -95,19 +95,75 @@ function CodeGlass({ children, ...props }: { children: React.ReactNode } & VasoP
 
 function VasoTitle() {
   const { settings } = useGlassContext()
+  const isHovering = useRef(false)
+
+  // Local state for values (defaulting to settings)
+  const [values, setValues] = useState({
+    depth: Math.max(1.1, settings.depth),
+    dispersion: settings.dispersion * 1.2
+  })
+
+  // Update local state when settings change (if not hovering)
+  useEffect(() => {
+    if (!isHovering.current) {
+      setValues({
+        depth: Math.max(1.1, settings.depth),
+        dispersion: settings.dispersion * 1.2,
+      })
+    }
+  }, [settings])
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    isHovering.current = true
+    const rect = e.currentTarget.getBoundingClientRect()
+    // normalized -0.5 to 0.5
+    const x = (e.clientX - rect.left) / rect.width - 0.5
+    const y = (e.clientY - rect.top) / rect.height - 0.5
+
+    const baseDepth = Math.max(1.1, settings.depth)
+    const baseDispersion = settings.dispersion * 1.2
+
+    // Interact effect:
+    // Moving mouse changes depth and dispersion to simulate luster/shifting light
+    const targetDepth = Math.max(0, baseDepth + y * 2)
+    const targetDispersion = Math.max(0, baseDispersion + Math.abs(x) * 3)
+
+    setValues({
+      depth: targetDepth,
+      dispersion: targetDispersion
+    })
+  }
+
+  const handlePointerLeave = () => {
+    isHovering.current = false
+    const baseDepth = Math.max(1.1, settings.depth)
+    const baseDispersion = settings.dispersion * 1.2
+
+    setValues({
+      depth: baseDepth,
+      dispersion: baseDispersion
+    })
+  }
 
   return (
-    <Vaso
-      component="span"
-      px={36}
-      py={8}
-      radius={settings.radius * 4}
-      depth={Math.max(1.1, settings.depth)}
-      blur={settings.blur}
-      dispersion={settings.dispersion * 1.2}
+    <div
+      className="inline-block cursor-pointer"
+      onPointerMove={handlePointerMove}
+      onPointerLeave={handlePointerLeave}
+      style={{ touchAction: 'none' }} // Prevent scrolling while interacting on touch
     >
-      <span>{'Vaso'}</span>
-    </Vaso>
+      <Vaso
+        component="span"
+        px={36}
+        py={8}
+        radius={settings.radius * 4}
+        depth={values.depth}
+        blur={settings.blur}
+        dispersion={values.dispersion}
+      >
+        <span>{'Vaso'}</span>
+      </Vaso>
+    </div>
   )
 }
 
@@ -207,7 +263,7 @@ function VasoSlider({
   const percentage = ((value - min) / (max - min)) * 100
   const trackWidth = trackRef.current?.clientWidth || 180 // px, Track width in pixels
   const thumbSize = 20 // Vaso thumb size
-  const thumbPosition = (percentage / 100) * (trackWidth - thumbSize)
+  const thumbPosition = Math.max(0, Math.min(trackWidth - thumbSize, (percentage / 100) * (trackWidth - thumbSize)))
 
   return (
     <div className="relative w-full h-4 flex items-center select-none">
@@ -218,7 +274,7 @@ function VasoSlider({
       <div
         className="absolute flex items-center justify-center"
         style={{
-          left: `${thumbPosition - 4}px`, // Center the larger touch area
+          left: `${Math.max(0, Math.min(trackWidth - (thumbSize + 8), thumbPosition - 4))}px`, // Center the larger touch area, clamp to track bounds
           width: `${thumbSize + 8}px`, // Larger touch target
           height: `${thumbSize + 8}px`,
         }}
@@ -525,13 +581,13 @@ function DraggableGlassDemo() {
     (e: React.PointerEvent) => {
       e.preventDefault()
       const target = e.currentTarget as HTMLElement
-      
+
       // Capture all pointer events to this element until released
       // This ensures we continue receiving pointermove events even when
       // the pointer moves outside the element boundaries (e.g. fast dragging)
       // Without this, the drag would stop when cursor leaves the element
       target.setPointerCapture(e.pointerId)
-      
+
       // Store initial pointer position and element position for delta calculations
       dragStartRef.current = {
         pointer: { x: e.clientX, y: e.clientY },
@@ -585,11 +641,11 @@ function DraggableGlassDemo() {
   const handleSliderPointerDown = useCallback((e: React.PointerEvent) => {
     e.preventDefault()
     e.stopPropagation() // Prevent this from triggering glass drag
-    
+
     const target = e.currentTarget as HTMLElement
     // Capture pointer so slider keeps responding even if pointer moves outside track
     target.setPointerCapture(e.pointerId)
-    
+
     // Calculate intensity from click/touch position on slider track
     if (!sliderRef.current) return
     const rect = sliderRef.current.getBoundingClientRect()
@@ -603,7 +659,7 @@ function DraggableGlassDemo() {
   const handleSliderPointerMove = useCallback((e: React.PointerEvent) => {
     // Only update if we're actively dragging the slider
     if (!e.currentTarget.hasPointerCapture(e.pointerId)) return
-    
+
     // Recalculate intensity based on current pointer position
     if (!sliderRef.current) return
     const rect = sliderRef.current.getBoundingClientRect()
@@ -688,7 +744,7 @@ function DraggableGlassDemo() {
               className="absolute h-2 bg-[#e3a75a] rounded-full overflow-hidden"
               style={{ width: `${glassIntensity * 100}%` }}
             />
-            
+
             {/* Vaso slider thumb */}
             <div
               className="absolute top-1/2 -translate-y-1/2 w-[36px] h-[24px]"
@@ -841,7 +897,7 @@ export default function Page() {
                 </CodeGlass>
                 <span className="theme-text">{' • '}</span>
                 <HoverCodeGlass px={4} py={2} dispersion={0} radius={16}>
-                  <a href="https://github.com/huozhi/vaso" className="font-bold underline theme-link">
+                  <a href="https://x.com/huozhi" className="font-bold underline theme-link">
                     <span className="font-bold p-1 rounded-md theme-author">X</span>
                   </a>
                 </HoverCodeGlass>
