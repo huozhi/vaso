@@ -257,13 +257,29 @@ function VasoSlider({
   onChange: (value: number) => void
 }) {
   const [isDragging, setIsDragging] = useState(false)
+  const [trackWidth, setTrackWidth] = useState(0)
   const trackRef = useRef<HTMLDivElement>(null)
+
+  // Measure track width after mount and on resize
+  useEffect(() => {
+    const measureTrack = () => {
+      if (trackRef.current) {
+        setTrackWidth(trackRef.current.clientWidth)
+      }
+    }
+    measureTrack()
+    window.addEventListener('resize', measureTrack)
+    return () => window.removeEventListener('resize', measureTrack)
+  }, [])
 
   // Calculate position as percentage
   const percentage = ((value - min) / (max - min)) * 100
-  const trackWidth = trackRef.current?.clientWidth || 180 // px, Track width in pixels
   const thumbSize = 20 // Vaso thumb size
-  const thumbPosition = Math.max(0, Math.min(trackWidth - thumbSize, (percentage / 100) * (trackWidth - thumbSize)))
+  const touchAreaSize = thumbSize + 8 // 28px touch target
+  const maxThumbLeft = Math.max(0, trackWidth - thumbSize)
+  const thumbPosition = (percentage / 100) * maxThumbLeft
+  // Position touch area centered on thumb, clamped to track bounds
+  const touchAreaLeft = Math.max(0, Math.min(trackWidth - touchAreaSize, thumbPosition - 4))
 
   return (
     <div className="relative w-full h-4 flex items-center select-none">
@@ -274,9 +290,9 @@ function VasoSlider({
       <div
         className="absolute flex items-center justify-center"
         style={{
-          left: `${Math.max(0, Math.min(trackWidth - (thumbSize + 8), thumbPosition - 4))}px`, // Center the larger touch area, clamp to track bounds
-          width: `${thumbSize + 8}px`, // Larger touch target
-          height: `${thumbSize + 8}px`,
+          left: `${touchAreaLeft}px`,
+          width: `${touchAreaSize}px`,
+          height: `${touchAreaSize}px`,
         }}
       >
         {/* Larger invisible touch area */}
@@ -297,8 +313,9 @@ function VasoSlider({
 
             const handlePointerMove = (e: PointerEvent) => {
               e.preventDefault()
+              const currentTrackWidth = trackRef.current?.clientWidth || trackWidth
               const deltaX = e.clientX - startX
-              const deltaPercentage = (deltaX / (trackWidth - thumbSize)) * 100
+              const deltaPercentage = (deltaX / Math.max(1, currentTrackWidth - thumbSize)) * 100
               const deltaValue = (deltaPercentage / 100) * (max - min)
               const newValue = Math.max(min, Math.min(max, startValue + deltaValue))
 
