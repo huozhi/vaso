@@ -1,6 +1,12 @@
 'use client'
 
-import React, { useEffect, useId, useRef, useState, useCallback, useLayoutEffect } from 'react'
+import React, { useEffect, useRef, useState, useCallback, useLayoutEffect } from 'react'
+
+let _vasoIdCounter = 0
+function useSafeId() {
+  const ref = useRef('vaso_' + (_vasoIdCounter++))
+  return ref.current
+}
 
 const distortionIntensity = 0.15
 const roundness = 0.6
@@ -211,7 +217,7 @@ const Vaso: React.FC<VasoProps> = ({
   dispersion = 0.5,
   ...htmlProps
 }) => {
-  const uid = useId()
+  const uid = useSafeId()
   const wrapperRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLElement>(null)
@@ -298,7 +304,9 @@ const Vaso: React.FC<VasoProps> = ({
           feDisplacementMap.parentElement?.setAttribute('width', `${finalWidth}`)
           feDisplacementMap.parentElement?.setAttribute('height', `${finalHeight}`)
 
-          container.style.backdropFilter = createBackdropFilter(uid, blur)
+          const bdf = createBackdropFilter(uid, blur)
+          container.style.backdropFilter = bdf
+          container.style.webkitBackdropFilter = bdf
         }
       } catch (error) {
         console.error(error)
@@ -360,6 +368,7 @@ const Vaso: React.FC<VasoProps> = ({
           height: `calc(100% + ${py * 2}px)`,
           overflow: 'hidden',
           backdropFilter: createBackdropFilter(uid, blur),
+          WebkitBackdropFilter: createBackdropFilter(uid, blur),
           ...(radius && { borderRadius: radius }),
           cursor: 'default',
           userSelect: 'none',
