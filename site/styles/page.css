@@ -52,26 +52,12 @@
     margin-bottom: 1rem !important;
   }
   
-  .mobile-controls {
-    position: static !important;
-    max-width: 100% !important;
-    margin-top: 0 !important;
-    align-self: stretch !important;
-  }
-  
-  .mobile-controls .space-y-1 {
-    margin-bottom: 0.5rem;
-  }
 }
 
 /* Small mobile devices */
 @media (max-width: 480px) {
   .mobile-h1 {
     font-size: 2.5rem !important; /* 40px for very small screens */
-  }
-  
-  .mobile-controls {
-    padding: 0.75rem !important;
   }
   
 }
@@ -144,7 +130,6 @@
 }
 
 .theme-content {
-  background-color: #f4f1e7;
   transition: background-color 500ms ease;
 }
 
@@ -200,7 +185,7 @@
 }
 
 [data-theme="dark"] .theme-controls {
-  background-color: rgba(31, 41, 55, 0.9);
+  background-color: rgba(31, 41, 55, 0.55);
   border-color: rgba(55, 65, 81, 0.5);
 }
 
@@ -284,4 +269,57 @@
 }
 [data-theme="dark"] .vaso-slider-thumb {
   background-color: #e5e5e579;
+}
+
+/* Floating glass panel. Animate transform only: opacity < 1 would blank the glass backdrop */
+.glass-panel {
+  animation: glass-panel-in 200ms cubic-bezier(0.2, 0.9, 0.3, 1.15);
+}
+
+@keyframes glass-panel-in {
+  from {
+    transform: scale(0.85);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+/* Long press opens the panel, so keep the native touch callout out of the way */
+.root {
+  -webkit-touch-callout: none;
+}
+
+/* Resize grip on the quick start glass: a solid chip so it reads over any text, nudging to hint at dragging */
+.drag-hint {
+  color: #374151;
+  background-color: rgba(255, 255, 255, 0.85);
+  animation: drag-hint-nudge 1.8s ease-in-out infinite;
+  transition: background-color 200ms ease;
+}
+
+.drag-hint-active {
+  background-color: #ffffff;
+  animation: none;
+}
+
+[data-theme="dark"] .drag-hint {
+  color: #e5e7eb;
+  background-color: rgba(55, 65, 81, 0.9);
+}
+
+@keyframes drag-hint-nudge {
+  /* transform, not translate: Tailwind's translate utilities center the icon with the translate property */
+  0%, 60%, 100% {
+    transform: translateX(0);
+  }
+  30% {
+    transform: translateX(3px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drag-hint {
+    animation: none;
+  }
 }

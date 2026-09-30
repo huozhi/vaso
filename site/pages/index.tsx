@@ -4,7 +4,7 @@ import { Vaso, type VasoProps } from 'vaso'
 import { Switcher } from '../components/switcher'
 import { HoverCodeGlass } from '../components/hover-vaso'
 import { GlassProvider, useGlassContext } from '../contexts/glass-context'
-import { useRef, useState, useEffect, useCallback, startTransition } from 'react'
+import { useRef, useState, useEffect, useLayoutEffect, useCallback, startTransition } from 'react'
 
 import '../styles/globals.css'
 import '../styles/page.css'
@@ -97,13 +97,60 @@ function CodeGlass({ children, ...props }: { children: React.ReactNode } & VasoP
 // How far the title glass can be dragged away from its resting spot over the title
 const TITLE_DRAG_LIMIT = { x: 72, y: 28 }
 
+// Intro for the title glass: a quick, damped shake so the rim refraction flashes across the letters
+const TITLE_INTRO_KEYFRAMES = [
+  { x: 0, y: 0 },
+  { x: 30, y: 6 },
+  { x: -24, y: -5 },
+  { x: 16, y: 3 },
+  { x: -9, y: -2 },
+  { x: 4, y: 1 },
+  { x: 0, y: 0 },
+]
+const TITLE_INTRO_SEGMENT = 85
+// Cap each frame's time step so load-time jank slows the shake down instead of skipping its peaks
+const TITLE_INTRO_MAX_STEP = 32
+
+const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2)
+
 function VasoTitle() {
   const { settings } = useGlassContext()
   const [offset, setOffset] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
   const dragStartRef = useRef({ pointer: { x: 0, y: 0 }, offset: { x: 0, y: 0 } })
+  const introFrameRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const duration = TITLE_INTRO_SEGMENT * (TITLE_INTRO_KEYFRAMES.length - 1)
+    let elapsed = 0
+    let lastTime: number | undefined
+    const tick = (now: number) => {
+      elapsed += Math.min(now - (lastTime ?? now), TITLE_INTRO_MAX_STEP)
+      lastTime = now
+      const segment = Math.min(Math.floor(elapsed / TITLE_INTRO_SEGMENT), TITLE_INTRO_KEYFRAMES.length - 2)
+      const progress = easeInOutCubic(Math.min(1, (elapsed - segment * TITLE_INTRO_SEGMENT) / TITLE_INTRO_SEGMENT))
+      const from = TITLE_INTRO_KEYFRAMES[segment]
+      const to = TITLE_INTRO_KEYFRAMES[segment + 1]
+      setOffset({ x: from.x + (to.x - from.x) * progress, y: from.y + (to.y - from.y) * progress })
+      if (elapsed >= duration) {
+        introFrameRef.current = null
+        return
+      }
+      introFrameRef.current = requestAnimationFrame(tick)
+    }
+    introFrameRef.current = requestAnimationFrame(tick)
+    return () => {
+      if (introFrameRef.current !== null) cancelAnimationFrame(introFrameRef.current)
+    }
+  }, [])
 
   const handlePointerDown = (e: React.PointerEvent) => {
+    // Grabbing the glass takes over from the intro animation
+    if (introFrameRef.current !== null) {
+      cancelAnimationFrame(introFrameRef.current)
+      introFrameRef.current = null
+    }
     e.preventDefault()
     e.currentTarget.setPointerCapture(e.pointerId)
     dragStartRef.current = { pointer: { x: e.clientX, y: e.clientY }, offset }
@@ -170,7 +217,7 @@ function IconGridDemo() {
       <div className="relative select-none">
         {/* First row */}
         <div className="text-sm theme-text-bg-sample-text font-normal leading-relaxed mb-1">
-          Quick start to draw a glass:
+          Quick start:
         </div>
 
         {/* Second row */}
@@ -191,8 +238,9 @@ function IconGridDemo() {
             width={vasoWidth}
             height={vasoHeight}
             depth={0.6}
-            blur={settings.blur}
-            dispersion={settings.dispersion}
+            // Frostier and more colorful than the global settings, while still following the panel
+            blur={settings.blur + 0.5}
+            dispersion={settings.dispersion + 0.5}
             className="vaso-slider transition-all rounded-full shadow-gray-50/30 duration-20 ease-out"
           >
             <div className="w-full h-full bg-transparent relative" style={{ width: vasoWidth, height: vasoHeight }}>
@@ -222,7 +270,29 @@ function IconGridDemo() {
                   document.addEventListener('pointermove', handlePointerMove)
                   document.addEventListener('pointerup', handlePointerUp)
                 }}
+                title="Drag to resize"
+                aria-label="Drag to resize the glass"
               />
+              {/* Drag affordance, so it reads as resizable at a glance */}
+              <span
+                className={`drag-hint absolute right-[10px] top-1/2 -translate-y-1/2 pointer-events-none flex items-center justify-center w-7 h-5 rounded-full shadow-sm ${
+                  isDragging ? 'drag-hint-active' : ''
+                }`}
+                aria-hidden
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M8 7l-5 5 5 5M16 7l5 5-5 5" />
+                </svg>
+              </span>
             </div>
           </Vaso>
         </div>
@@ -249,16 +319,15 @@ function VasoSlider({
   const [trackWidth, setTrackWidth] = useState(0)
   const trackRef = useRef<HTMLDivElement>(null)
 
-  // Measure track width after mount and on resize
+  // Track the track's width, which can settle after mount (e.g. inside the floating panel)
   useEffect(() => {
-    const measureTrack = () => {
-      if (trackRef.current) {
-        setTrackWidth(trackRef.current.clientWidth)
-      }
-    }
+    const track = trackRef.current
+    if (!track) return
+    const measureTrack = () => setTrackWidth(track.clientWidth)
     measureTrack()
-    window.addEventListener('resize', measureTrack)
-    return () => window.removeEventListener('resize', measureTrack)
+    const observer = new ResizeObserver(measureTrack)
+    observer.observe(track)
+    return () => observer.disconnect()
   }, [])
 
   // Calculate position as percentage
@@ -352,67 +421,220 @@ function VasoSlider({
   )
 }
 
-function GlassControls() {
-  const { settings, updateSettings } = useGlassContext()
+const GLASS_ATTRIBUTES = [
+  { key: 'depth', label: 'Depth', min: 0, max: 2, step: 0.1 },
+  { key: 'blur', label: 'Blur', min: 0, max: 2, step: 0.2 },
+  { key: 'radius', label: 'Radius', min: 0, max: 16, step: 2 },
+  { key: 'dispersion', label: 'Dispersion', min: 0, max: 2, step: 0.1 },
+] as const
+
+// Presses on controls are their own interaction (e.g. toggling the theme twice), never a panel trigger
+const PANEL_TRIGGER_EXCLUDE =
+  'a, button, input, textarea, select, label, [role="button"], [role="switch"], [data-glass-panel]'
+
+// Hit-test the glass layers themselves: they ignore pointer events and can overhang their element (px/py)
+function getGlassAt(target: EventTarget | null, x: number, y: number) {
+  if (target instanceof Element && target.closest(PANEL_TRIGGER_EXCLUDE)) return null
   return (
-    <div className="sticky top-[50px] lg:fixed lg:top-4 lg:right-4 z-50 rounded-xl shadow-[0_35px_30px_-15px_rgba(0,0,0,0.2),0_10px_10px_-5px_rgba(0,0,0,0.3),0_10px_10px_-5px_rgba(0,0,0,0.2)] overflow-hidden mb-4 lg:mb-0 mx-4 lg:mx-0">
-      <div className="backdrop-blur-sm px-6 py-3 mobile-controls theme-controls w-auto">
-        <p className="text-sm font-medium mb-3 theme-controls-title">Glass Attributes</p>
-        <div className="grid grid-cols-2 gap-3 text-xs mobile-controls-grid theme-controls-text">
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <span>Depth</span>
-              <span className="font-mono">{settings.depth.toFixed(1)}</span>
+    Array.from(document.querySelectorAll('[data-vaso]')).find((glass) => {
+      if (glass.closest('[data-glass-panel]')) return false
+      const rect = glass.getBoundingClientRect()
+      return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
+    }) ?? null
+  )
+}
+const DOUBLE_CLICK_MS = 300
+const DOUBLE_CLICK_MOVE_TOLERANCE = 5
+const LONG_PRESS_MS = 500
+const LONG_PRESS_MOVE_TOLERANCE = 10
+const PANEL_MARGIN = 12
+const SCROLL_CLOSE_DISTANCE = 8
+
+function GlassPanel() {
+  const { settings, updateSettings } = useGlassContext()
+  const [anchor, setAnchor] = useState<{ x: number; y: number } | null>(null)
+  const [position, setPosition] = useState<{ left: number; top: number; origin: string } | null>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+
+  // Open on double click (mouse) or long press (touch) on a glass
+  useEffect(() => {
+    // Detect double clicks from pointerdown instead of the dblclick event: draggables that call
+    // preventDefault() on pointerdown suppress dblclick, and toggles move away after the first click,
+    // so the glass is hit-tested on the first press
+    let lastMousePress: { time: number; x: number; y: number; glass: Element | null } | null = null
+    const handleMousePress = (e: PointerEvent) => {
+      const previous = lastMousePress
+      const isDoubleClick =
+        previous &&
+        e.timeStamp - previous.time < DOUBLE_CLICK_MS &&
+        Math.hypot(e.clientX - previous.x, e.clientY - previous.y) < DOUBLE_CLICK_MOVE_TOLERANCE
+      if (isDoubleClick) {
+        lastMousePress = null
+        // Both presses must land on the same glass
+        if (!previous.glass || previous.glass !== getGlassAt(e.target, e.clientX, e.clientY)) return
+        // Drop the word selection the double click makes
+        requestAnimationFrame(() => window.getSelection()?.removeAllRanges())
+        setAnchor({ x: e.clientX, y: e.clientY })
+        return
+      }
+      lastMousePress = { time: e.timeStamp, x: e.clientX, y: e.clientY, glass: getGlassAt(e.target, e.clientX, e.clientY) }
+    }
+
+    let pressTimer: ReturnType<typeof setTimeout> | undefined
+    let pressStart: { x: number; y: number } | null = null
+    const cancelPress = () => {
+      clearTimeout(pressTimer)
+      pressStart = null
+    }
+    // A long press ends with a click on whatever is under the finger, so swallow it
+    const suppressNextClick = () => {
+      const swallow = (e: MouseEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+      }
+      window.addEventListener('click', swallow, { capture: true, once: true })
+      setTimeout(() => window.removeEventListener('click', swallow, { capture: true }), 800)
+    }
+
+    const handlePointerDown = (e: PointerEvent) => {
+      if (e.pointerType === 'mouse') return handleMousePress(e)
+      if (!getGlassAt(e.target, e.clientX, e.clientY)) return
+      pressStart = { x: e.clientX, y: e.clientY }
+      clearTimeout(pressTimer)
+      pressTimer = setTimeout(() => {
+        if (!pressStart) return
+        navigator.vibrate?.(10)
+        suppressNextClick()
+        setAnchor(pressStart)
+        pressStart = null
+      }, LONG_PRESS_MS)
+    }
+    const handlePointerMove = (e: PointerEvent) => {
+      if (!pressStart) return
+      if (Math.hypot(e.clientX - pressStart.x, e.clientY - pressStart.y) > LONG_PRESS_MOVE_TOLERANCE) cancelPress()
+    }
+    // Stop the native context menu from competing with the long press on touch devices
+    const handleContextMenu = (e: MouseEvent) => {
+      if (pressStart || (e as PointerEvent).pointerType === 'touch') e.preventDefault()
+    }
+
+    // Capture phase, so handlers that stop propagation (on the page or from extensions) can't swallow the gesture
+    window.addEventListener('pointerdown', handlePointerDown, true)
+    window.addEventListener('pointermove', handlePointerMove, true)
+    window.addEventListener('pointerup', cancelPress, true)
+    window.addEventListener('pointercancel', cancelPress, true)
+    window.addEventListener('scroll', cancelPress, { passive: true })
+    window.addEventListener('contextmenu', handleContextMenu)
+    return () => {
+      cancelPress()
+      window.removeEventListener('pointerdown', handlePointerDown, true)
+      window.removeEventListener('pointermove', handlePointerMove, true)
+      window.removeEventListener('pointerup', cancelPress, true)
+      window.removeEventListener('pointercancel', cancelPress, true)
+      window.removeEventListener('scroll', cancelPress)
+      window.removeEventListener('contextmenu', handleContextMenu)
+    }
+  }, [])
+
+  // Close on outside press, Escape, or scroll
+  useEffect(() => {
+    if (!anchor) return
+    const close = () => setAnchor(null)
+    // The press that opened the panel can still be dispatching when this listener is added, so skip it
+    const openedAt = performance.now()
+    const handlePointerDown = (e: PointerEvent) => {
+      if (e.timeStamp < openedAt) return
+      if (!panelRef.current?.contains(e.target as Node)) close()
+    }
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close()
+    }
+    // Close once the page actually scrolls. Small layout-driven adjustments (scroll anchoring) don't count
+    const openedScrollY = window.scrollY
+    const handleScroll = (e: Event) => {
+      const isPage = e.target === document
+      if (!isPage || Math.abs(window.scrollY - openedScrollY) > SCROLL_CLOSE_DISTANCE) close()
+    }
+    window.addEventListener('pointerdown', handlePointerDown)
+    window.addEventListener('keydown', handleKeyDown)
+    // Capture phase catches scrolling in any container, not just the page
+    window.addEventListener('scroll', handleScroll, { capture: true, passive: true })
+    return () => {
+      window.removeEventListener('pointerdown', handlePointerDown)
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('scroll', handleScroll, { capture: true })
+    }
+  }, [anchor])
+
+  // Place the panel next to the pointer, flipping sides so it stays inside the viewport
+  useLayoutEffect(() => {
+    const panel = panelRef.current
+    if (!anchor || !panel) {
+      setPosition(null)
+      return
+    }
+    const place = () => {
+      const { offsetWidth: width, offsetHeight: height } = panel
+      const flipX = anchor.x + width + PANEL_MARGIN > window.innerWidth
+      const flipY = anchor.y + height + PANEL_MARGIN > window.innerHeight
+      const clamp = (value: number, size: number, viewport: number) =>
+        Math.max(PANEL_MARGIN, Math.min(viewport - size - PANEL_MARGIN, value))
+      setPosition({
+        left: clamp(flipX ? anchor.x - width : anchor.x, width, window.innerWidth),
+        top: clamp(flipY ? anchor.y - height : anchor.y, height, window.innerHeight),
+        origin: `${flipX ? 'right' : 'left'} ${flipY ? 'bottom' : 'top'}`,
+      })
+    }
+    place()
+    // Re-place when the panel's size settles (late styles or fonts) or the viewport changes
+    const observer = new ResizeObserver(place)
+    observer.observe(panel)
+    window.addEventListener('resize', place)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', place)
+    }
+  }, [anchor])
+
+  if (!anchor) return null
+
+  return (
+    <div
+      ref={panelRef}
+      data-glass-panel
+      role="dialog"
+      aria-label="Glass attributes"
+      className="glass-panel z-[1000] w-[calc(100vw-24px)] max-w-[288px]"
+      style={{
+        // Inline so the panel never lands in the page flow, even before utility styles are ready
+        position: 'fixed',
+        left: position?.left ?? anchor.x,
+        top: position?.top ?? anchor.y,
+        transformOrigin: position?.origin,
+        // Measure off-screen first, then reveal at the clamped position
+        visibility: position ? 'visible' : 'hidden',
+      }}
+    >
+      <Vaso radius={20} depth={0.3} blur={6} dispersion={0} className="rounded-[20px]">
+        {/* Positioned so the content paints above the glass layer instead of being refracted by it */}
+        <div className="relative grid grid-cols-2 gap-x-5 gap-y-4 px-5 py-4 rounded-[20px] text-xs theme-controls theme-controls-text">
+          {GLASS_ATTRIBUTES.map(({ key, label, min, max, step }) => (
+            <div key={key}>
+              <div className="flex items-center justify-between mb-1.5">
+                <span>{label}</span>
+                <span className="font-mono tabular-nums">{settings[key].toFixed(1)}</span>
+              </div>
+              <VasoSlider
+                value={settings[key]}
+                min={min}
+                max={max}
+                step={step}
+                onChange={(value) => updateSettings({ [key]: value })}
+              />
             </div>
-            <VasoSlider
-              value={settings.depth}
-              min={0}
-              max={2}
-              step={0.1}
-              onChange={(value) => updateSettings({ depth: value })}
-            />
-          </div>
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <span>Blur</span>
-              <span className="font-mono">{settings.blur?.toFixed(1)}</span>
-            </div>
-            <VasoSlider
-              value={settings.blur}
-              min={0}
-              max={2}
-              step={0.2}
-              onChange={(value) => updateSettings({ blur: value })}
-            />
-          </div>
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <span>Radius</span>
-              <span className="font-mono">{settings.radius?.toFixed(1)}</span>
-            </div>
-            <VasoSlider
-              value={settings.radius}
-              min={0}
-              max={16}
-              step={2}
-              onChange={(value) => updateSettings({ radius: value })}
-            />
-          </div>
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <span>Dispersion</span>
-              <span className="font-mono">{settings.dispersion?.toFixed(1)}</span>
-            </div>
-            <VasoSlider
-              value={settings.dispersion}
-              min={0}
-              max={2}
-              step={0.1}
-              onChange={(value) => updateSettings({ dispersion: value })}
-            />
-          </div>
+          ))}
         </div>
-      </div>
+      </Vaso>
     </div>
   )
 }
@@ -460,12 +682,20 @@ function ThemeSwitcherDemo({ theme, setTheme }: { theme: string; setTheme: (them
   )
 }
 
+const FROSTED_VIDEO_SPEED = 2
+
 function WaterFlowDemo() {
   const { settings } = useGlassContext()
-  const bgUrl =
-    'https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExZG1wZWU5azNrYmV3NXJ1enplbDFoMXR2ZXV5MWE2bm5yMnU1MHhrdyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/EzUMaltmsbK3G1Y5Ow/giphy.gif'
-  const [frostedGlass, setFrostedGlass] = useState(false)
+  // The MP4 version of the GIF, so the playback speed can be changed
+  const videoUrl = 'https://media1.giphy.com/media/EzUMaltmsbK3G1Y5Ow/giphy.mp4'
+  const [frostedGlass, setFrostedGlass] = useState(true)
   const [factor, setFactor] = useState(0.5)
+  const videoRef = useRef<HTMLVideoElement>(null)
+
+  // Metadata can load before hydration attaches onLoadedMetadata, so also apply the rate on mount
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.playbackRate = FROSTED_VIDEO_SPEED
+  }, [])
   useSpring({
     factor: frostedGlass ? 1.5 : 0.2,
     config: {
@@ -482,11 +712,18 @@ function WaterFlowDemo() {
     <div className="flex flex-col items-center gap-6">
       {/* Background Container (larger) */}
       <div className="relative w-72 h-30 rounded-3xl overflow-hidden shadow-2xl">
-        {/* Background Image (fills entire container) */}
-        <div
-          className="absolute inset-0 bg-cover bg-center"
-          style={{
-            backgroundImage: `url(${bgUrl})`,
+        {/* Background video (fills entire container) */}
+        <video
+          ref={videoRef}
+          className="absolute inset-0 w-full h-full object-cover"
+          src={videoUrl}
+          autoPlay
+          muted
+          loop
+          playsInline
+          // Loading media resets the rate, so apply it again once metadata is ready
+          onLoadedMetadata={(e) => {
+            e.currentTarget.playbackRate = FROSTED_VIDEO_SPEED
           }}
         />
 
@@ -813,10 +1050,10 @@ function Home() {
           {/* Browser compatibility warning */}
           <BrowserWarning />
 
-          {/* Sticky Controls */}
-          <GlassControls />
+          {/* Floating controls, opened by double click or long press */}
+          <GlassPanel />
 
-          <div className="px-4 py-6 lg:p-8 sm:p-4 space-y-8 rounded-lg shadow-[0_35px_60px_-15px_rgba(0,0,0,0.2),0_20px_25px_-5px_rgba(0,0,0,0.3),0_10px_10px_-5px_rgba(0,0,0,0.2)] theme-content">
+          <div className="px-4 py-6 lg:p-8 sm:p-4 space-y-8 rounded-lg theme-content">
             <section className="relative border-b pb-4 theme-section">
               <h2 className="text-lg font-semibold mb-4 theme-heading">Play</h2>
               <div className="mt-2 relative border-t border-[var(--theme-border-color)] py-4">
