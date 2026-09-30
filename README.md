@@ -56,7 +56,14 @@ function App() {
 
 The refraction is rendered with an SVG filter inside `backdrop-filter`, which is currently only supported by Chromium based browsers (Chrome, Edge, Arc, Opera, ...).
 
-In Safari and Firefox, Vaso detects the missing support and falls back to a frosted glass (backdrop blur, saturation and the specular rim) instead of rendering nothing.
+Safari and Firefox don't render those, so Vaso refracts a copy of what's behind the glass instead, with no extra setup:
+
+- It clones the nearest ancestor with visible content (text, images, video, canvas or a background), leaving out every glass layer and anything stacked above this glass.
+- The clone is kept aligned every frame, so dragging, scrolling and transitions stay in sync. Videos and canvases are mirrored into it frame by frame.
+- DOM changes re-clone it, swapping only once the new clone's images and videos have loaded. Style changes (themes, late stylesheets) refresh it without cloning.
+- Transparent areas are filled with the color behind the content, so nothing shows through twice.
+
+Limits: sources larger than 400 elements aren't cloned (the glass keeps its blur and rim instead), and CSS that depends on an ancestor outside the cloned element may style the copy differently.
 
 ## Examples
 

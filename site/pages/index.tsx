@@ -10,71 +10,6 @@ import '../styles/globals.css'
 import '../styles/page.css'
 import { useSpring } from '@react-spring/web'
 
-// Browser support detection
-function detectBrowserSupport() {
-  if (typeof window === 'undefined') return { isSupported: true }
-
-  const userAgent = navigator.userAgent.toLowerCase()
-
-  // Safari detection (including mobile Safari)
-  const isSafari = /safari/.test(userAgent) && !/chrome/.test(userAgent)
-
-  // Firefox detection
-  const isFirefox = /firefox/.test(userAgent)
-
-  // Check for SVG filter support
-  const svgSupported =
-    'createElementNS' in document &&
-    document.createElementNS('http://www.w3.org/2000/svg', 'feDisplacementMap') instanceof SVGElement
-
-  // Check for backdrop-filter support
-  const backdropFilterSupported = CSS.supports('backdrop-filter', 'blur(1px)')
-
-  let browser = 'unknown'
-  if (isSafari) browser = 'safari'
-  else if (isFirefox) browser = 'firefox'
-
-  const isSupported = svgSupported && backdropFilterSupported && !isSafari && !isFirefox
-
-  return { isSupported, browser }
-}
-
-function BrowserWarning() {
-  const [showWarning, setShowWarning] = useState(false)
-
-  useEffect(() => {
-    const info = detectBrowserSupport()
-    setShowWarning(!info.isSupported)
-  }, [])
-
-  if (!showWarning) return null
-
-  return (
-    <div className="fixed top-0 left-0 right-0 z-[9999] h-[30px]">
-      <div className="bg-yellow-100/80 backdrop-blur-xl h-full shadow-[0_8px_32px_rgba(0,0,0,0.1)] border-b border-yellow-200/50 px-4">
-        <div className="max-w-7xl mx-auto h-full flex items-center justify-between">
-          {/* Content */}
-          <p className="text-sm text-gray-700">Your browser doesn't support refraction yet, showing frosted glass fallback</p>
-
-          {/* Close button */}
-          <button
-            onClick={() => setShowWarning(false)}
-            className="ml-4 p-1.5 rounded-full bg-transparent transition-colors"
-          >
-            <svg className="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
-              <path
-                fillRule="evenodd"
-                d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 function CodeGlass({ children, ...props }: { children: React.ReactNode } & VasoProps<HTMLSpanElement>) {
   const { settings } = useGlassContext()
 
@@ -689,7 +624,8 @@ function WaterFlowDemo() {
   // The MP4 version of the GIF, so the playback speed can be changed
   const videoUrl = 'https://media1.giphy.com/media/EzUMaltmsbK3G1Y5Ow/giphy.mp4'
   const [frostedGlass, setFrostedGlass] = useState(true)
-  const [factor, setFactor] = useState(0.5)
+  // 0 = clear glass, 1 = frosted; animated between the two
+  const [frost, setFrost] = useState(1)
   const videoRef = useRef<HTMLVideoElement>(null)
 
   // Metadata can load before hydration attaches onLoadedMetadata, so also apply the rate on mount
@@ -697,7 +633,7 @@ function WaterFlowDemo() {
     if (videoRef.current) videoRef.current.playbackRate = FROSTED_VIDEO_SPEED
   }, [])
   useSpring({
-    factor: frostedGlass ? 1.5 : 0.2,
+    frost: frostedGlass ? 1 : 0,
     config: {
       tension: 170,
       friction: 26,
@@ -705,7 +641,7 @@ function WaterFlowDemo() {
     },
     easing: 'easeInOutCubic',
     onChange: ({ value }) => {
-      setFactor(value.factor)
+      setFrost(value.frost)
     },
   })
   return (
@@ -732,14 +668,20 @@ function WaterFlowDemo() {
           {/* Vaso Glass Effect (only over island) */}
           <Vaso
             radius={20}
-            depth={factor * 2}
-            blur={factor * 1.2}
-            dispersion={settings.dispersion * factor}
+            // Clear: crisp and strongly refracting. Frosted: heavily blurred with a brighter rim
+            depth={2.4 - frost * 1.2}
+            blur={0.3 + frost * 5.7}
+            specular={0.5 + frost * 0.4}
+            dispersion={settings.dispersion * (1 - frost * 0.5)}
             className="top-0 left-0 w-full h-full rounded-full overflow-hidden"
           ></Vaso>
 
           {/* Icons (always on top) */}
-          <div className="absolute inset-0 flex items-center justify-between rounded-full text-[#fff]">
+          {/* The frosted tint sits above the glass with the icons, so it looks the same in every browser */}
+          <div
+            className="absolute inset-0 flex items-center justify-between rounded-full text-[#fff]"
+            style={{ backgroundColor: `rgba(255, 255, 255, ${frost * 0.18})` }}
+          >
             {/* Back Arrow */}
             <button className="p-3 rounded-full transition-colors">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1046,9 +988,6 @@ function Home() {
               <p className="text-lg theme-description">Liquid Glass Effect for React</p>
             </div>
           </header>
-
-          {/* Browser compatibility warning */}
-          <BrowserWarning />
 
           {/* Floating controls, opened by double click or long press */}
           <GlassPanel />

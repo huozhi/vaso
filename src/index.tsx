@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { attachBackdropCopy, GLASS_ROOT_ATTRIBUTE } from './backdrop-copy'
 
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect
 
@@ -89,6 +90,15 @@ function getSvgBackdropSupport() {
   }
   return svgBackdropSupport
 }
+// WebKit (Safari, and every iOS browser) resolves userSpaceOnUse filters on HTML elements against an
+// ancestor instead of the element, so the backdrop copy uses objectBoundingBox units there. Chromium and
+// Firefox scale objectBoundingBox displacement differently from each other, so they keep userSpaceOnUse.
+let webKitFilterUnits: boolean | undefined
+function usesBoundingBoxUnits() {
+  webKitFilterUnits ??=
+    /AppleWebKit\//.test(navigator.userAgent) && !/Chrome\/|Chromium\/|Edg\/|Firefox\//.test(navigator.userAgent)
+  return webKitFilterUnits
+}
 const subscribeNoop = () => () => {}
 const getServerSupport = () => false
 
@@ -124,11 +134,13 @@ function sampleProfile(t: number) {
 const mapCache = new Map<string, string>()
 let mapCanvas: HTMLCanvasElement | undefined
 
-function getDisplacementMap(width: number, height: number, radius: number, bezel: number) {
+// `axisScale` pre-scales each axis of the field. objectBoundingBox displacement multiplies x by the
+// width and y by the height, so shrinking the longer axis here keeps the refraction isotropic.
+function getDisplacementMap(width: number, height: number, radius: number, bezel: number, axisScale = { x: 1, y: 1 }) {
   const res = Math.min(1, Math.sqrt(MAX_MAP_PIXELS / (width * height)))
   const w = Math.max(1, Math.round(width * res))
   const h = Math.max(1, Math.round(height * res))
-  const key = `${w}:${h}:${radius}:${bezel}`
+  const key = `${w}:${h}:${radius}:${bezel}:${axisScale.x}:${axisScale.y}`
 
   const cached = mapCache.get(key)
   if (cached) {
@@ -180,8 +192,8 @@ function getDisplacementMap(width: number, height: number, radius: number, bezel
       if (distance < bezel) {
         // Light bends toward the center of a convex lens, so sample inward
         const magnitude = sampleProfile(distance / bezel)
-        dx = -Math.sign(cx) * nx * magnitude
-        dy = -Math.sign(cy) * ny * magnitude
+        dx = -Math.sign(cx) * nx * magnitude * axisScale.x
+        dy = -Math.sign(cy) * ny * magnitude * axisScale.y
       }
 
       const i = (y * w + x) * 4
@@ -218,6 +230,8 @@ function createSpecularShadow(specular: number | false) {
 // band of wavelengths. Red bends the least and violet the most, like light through a prism.
 // Every channel's weights sum to 1 across the samples so undispersed areas stay neutral.
 const MAX_SPECTRUM_SAMPLES = 9
+// Refracting a backdrop copy runs on the CPU in Safari, so keep the spectrum cheap there
+const MAX_COPY_SPECTRUM_SAMPLES = 3
 // Maximum pixels between two neighboring samples before the bands show as separate ghosts
 const SPECTRUM_STEP = 1.25
 const spectrumCache = new Map<number, string[]>()
@@ -245,7 +259,7 @@ function getSpectrum(samples: number) {
   return matrices
 }
 
-type Geometry = { width: number; height: number; radius: number; href: string }
+type Geometry = { width: number; height: number; radius: number; href: string; boundingBoxUnits: boolean }
 
 const Vaso: React.FC<VasoProps> = ({
   component: WrapComponent = 'div',
@@ -265,8 +279,11 @@ const Vaso: React.FC<VasoProps> = ({
   const filterId = `vaso-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`
   const wrapperRef = useRef<HTMLElement>(null)
   const containerRef = useRef<HTMLElement>(null)
+  const layerRef = useRef<HTMLSpanElement>(null)
   const svgSupported = useSyncExternalStore(subscribeNoop, getSvgBackdropSupport, getServerSupport)
   const [geometry, setGeometry] = useState<Geometry | null>(null)
+  // Without backdrop refraction (Safari, Firefox), refract a clone of what's behind the glass instead
+  const copyMode = !svgSupported
 
   useIsomorphicLayoutEffect(() => {
     const wrapper = wrapperRef.current
@@ -281,19 +298,23 @@ const Vaso: React.FC<VasoProps> = ({
       const cssRadius = parseFloat(getComputedStyle(container).borderTopLeftRadius) || 0
       const finalRadius = Math.min(cssRadius, finalWidth / 2, finalHeight / 2)
 
+      const boundingBoxUnits = copyMode && usesBoundingBoxUnits()
+
       setGeometry((prev) => {
         if (
           prev &&
           prev.width === finalWidth &&
           prev.height === finalHeight &&
           prev.radius === finalRadius &&
-          !!prev.href === svgSupported
+          prev.boundingBoxUnits === boundingBoxUnits
         ) {
           return prev
         }
         const bezel = (Math.min(finalWidth, finalHeight) / 2) * BEZEL_RATIO
-        const href = svgSupported ? getDisplacementMap(finalWidth, finalHeight, finalRadius, bezel) : ''
-        return { width: finalWidth, height: finalHeight, radius: finalRadius, href }
+        const shortSide = Math.min(finalWidth, finalHeight)
+        const axisScale = boundingBoxUnits ? { x: shortSide / finalWidth, y: shortSide / finalHeight } : undefined
+        const href = getDisplacementMap(finalWidth, finalHeight, finalRadius, bezel, axisScale)
+        return { width: finalWidth, height: finalHeight, radius: finalRadius, href, boundingBoxUnits }
       })
     }
 
@@ -302,27 +323,45 @@ const Vaso: React.FC<VasoProps> = ({
     const observer = new ResizeObserver(measure)
     observer.observe(wrapper)
     return () => observer.disconnect()
-  }, [width, height, px, py, radius, svgSupported])
+  }, [width, height, px, py, radius, copyMode])
 
   const useSvgFilter = svgSupported && !!geometry?.href
+  const useCopyFilter = copyMode && !!geometry?.href
+
+  // Clone what's behind the glass into it and keep the clone aligned (see backdrop-copy.ts)
+  useEffect(() => {
+    const wrapper = wrapperRef.current
+    const container = containerRef.current
+    const layer = layerRef.current
+    if (!useCopyFilter || !wrapper || !container || !layer) return
+    return attachBackdropCopy({ wrapper, container, layer })
+  }, [useCopyFilter])
+
   const bezel = geometry ? (Math.min(geometry.width, geometry.height) / 2) * BEZEL_RATIO : 0
+  // In objectBoundingBox units, displacement is a fraction of the box. The map pre-scales each axis to the
+  // short side, so express pixel offsets as a fraction of it
+  const boundingBoxUnits = !!geometry?.boundingBoxUnits
+  const unit = boundingBoxUnits && geometry ? 1 / Math.min(geometry.width, geometry.height) : 1
   // The map stores unit vectors in [-0.5, 0.5], so double the scale to reach full offset
-  const scale = 2 * depth * bezel * REFRACTION
+  const scale = 2 * depth * bezel * REFRACTION * unit
   // Total separation in pixels between the red and violet images at the rim
   // Flat glass doesn't refract, so fade dispersion out as depth approaches zero
-  const spread = dispersion ? Math.max(dispersion, 0) * bezel * DISPERSION * Math.min(1, Math.abs(depth) * 4) : 0
+  const spreadPx = dispersion ? Math.max(dispersion, 0) * bezel * DISPERSION * Math.min(1, Math.abs(depth) * 4) : 0
+  const spread = spreadPx * unit
+  const maxSamples = copyMode ? MAX_COPY_SPECTRUM_SAMPLES : MAX_SPECTRUM_SAMPLES
   const spectrum =
-    spread > 0.5 ? getSpectrum(Math.min(MAX_SPECTRUM_SAMPLES, Math.max(3, Math.ceil(spread / SPECTRUM_STEP) + 1))) : null
+    spreadPx > 0.5 ? getSpectrum(Math.min(maxSamples, Math.max(3, Math.ceil(spreadPx / SPECTRUM_STEP) + 1))) : null
 
   // Avoid brightness/contrast boosts here: they clip light backdrops to flat white
-  const backdropFilter = useSvgFilter
-    ? `url(#${filterId}) blur(${blur}px) saturate(1.2)`
-    : // Without refraction, lean on frosting so the glass still reads as glass
-      `blur(${Math.min(blur + 4 * Math.abs(depth), 12)}px) saturate(1.5)`
+  const refractionFilter = `url(#${filterId}) blur(${blur}px) saturate(1.2)`
+  // Without backdrop refraction (Safari, Firefox), keep the same blur as Chromium. The backdrop copy
+  // covers what it can; the specular rim and shadow still outline the glass elsewhere
+  const backdropFilter = useSvgFilter ? refractionFilter : `blur(${blur}px) saturate(1.2)`
 
   return (
     <WrapComponent
       {...htmlProps}
+      {...{ [GLASS_ROOT_ATTRIBUTE]: '' }}
       style={{ position: 'relative', ...style }}
       // @ts-expect-error: dynamic ref assignment, improve this ref type later
       ref={wrapperRef}
@@ -347,9 +386,28 @@ const Vaso: React.FC<VasoProps> = ({
           userSelect: 'none',
           pointerEvents: 'none', // Allow clicks to pass through to content
         }}
-      />
+      >
+        {useCopyFilter && (
+          // Sized to the glass so the filter's coordinates line up with the displacement map. Its children
+          // are managed by backdrop-copy.ts, outside React
+          <span
+            ref={layerRef}
+            aria-hidden
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: geometry.width,
+              height: geometry.height,
+              // Clip the copy so the element's bounding box, used by objectBoundingBox filters, is the glass
+              overflow: 'hidden',
+              filter: refractionFilter,
+            }}
+          />
+        )}
+      </WrapComponent>
 
-      {useSvgFilter && (
+      {(useSvgFilter || useCopyFilter) && (
         <svg
           aria-hidden
           focusable="false"
@@ -360,19 +418,20 @@ const Vaso: React.FC<VasoProps> = ({
           <defs>
             <filter
               id={filterId}
-              filterUnits="userSpaceOnUse"
+              filterUnits={boundingBoxUnits ? 'objectBoundingBox' : 'userSpaceOnUse'}
+              primitiveUnits={boundingBoxUnits ? 'objectBoundingBox' : 'userSpaceOnUse'}
               colorInterpolationFilters="sRGB"
               x="0"
               y="0"
-              width={geometry.width}
-              height={geometry.height}
+              width={boundingBoxUnits ? 1 : geometry.width}
+              height={boundingBoxUnits ? 1 : geometry.height}
             >
               <feImage
                 href={geometry.href}
                 x="0"
                 y="0"
-                width={geometry.width}
-                height={geometry.height}
+                width={boundingBoxUnits ? 1 : geometry.width}
+                height={boundingBoxUnits ? 1 : geometry.height}
                 preserveAspectRatio="none"
                 result="map"
               />
