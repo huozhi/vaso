@@ -9,8 +9,10 @@
     "dist"
   ],
   "scripts": {
-    "dev": "pnpm next site",
+    "dev": "pnpm build && (bunchee --watch --no-clean & devjar dev site)",
     "build": "rm -rf dist && bunchee",
+    "build:site": "pnpm build && devjar build site --origin https://vaso-react.vercel.app",
+    "start:site": "devjar start site/dist",
     "prepublishOnly": "pnpm build"
   },
   "author": "huozhi",
@@ -18,19 +20,14 @@
   "packageManager": "pnpm@9.15.9",
   "devDependencies": {
     "@react-spring/web": "^10.0.1",
-    "@tailwindcss/postcss": "^4.1.11",
     "@types/node": "24.0.7",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "bunchee": "^6.5.4",
-    "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "lucide-react": "^0.525.0",
-    "next": "^16.1.1",
+    "devjar": "^1.1.0",
     "react": "^19.2.1",
-    "react-dom": "^19.2.1",
-    "tailwind-merge": "^3.0.2",
-    "tailwindcss": "^4.1.11"
+    "react-dom": "^19.2.1"
   },
   "peerDependencies": {
     "react": "^18 || ^19"

@@ -3,7 +3,7 @@
 import React, { useEffect } from 'react'
 import { useState } from 'react'
 import { useSpring } from '@react-spring/web'
-import { Vaso, VasoProps } from "../../src"
+import { Vaso, VasoProps } from "vaso"
 import { useGlassContext } from "../contexts/glass-context"
 
 type HoverCodeGlassProps = VasoProps<HTMLSpanElement>

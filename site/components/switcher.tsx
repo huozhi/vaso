@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useMemo, useState } from 'react'
-import { Vaso } from '../../src/index'
+import { Vaso } from 'vaso'
 import clsx from 'clsx'
 import { useGlassContext } from '../contexts/glass-context'
 

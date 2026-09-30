@@ -1,0 +1,36 @@
+html, body {
+  overscroll-behavior-y: none;
+  margin: 0;
+  padding: 0;
+  touch-action: pan-y;
+}
+
+::-webkit-scrollbar {
+  display: none;
+}
+
+/* Unlayered, so these override Tailwind's default radius scale */
+:root {
+  --radius-md: 0.5rem;
+  --radius-lg: 0.625rem;
+  --radius-xl: 0.875rem;
+}
+
+/* Kept in the base layer so Tailwind utilities still take precedence */
+@layer base {
+  *, ::before, ::after {
+    border-color: oklch(0.922 0 0);
+    outline-color: oklch(0.708 0 0 / 50%);
+  }
+  body {
+    background-color: oklch(1 0 0);
+    color: oklch(0.145 0 0);
+  }
+}
+
+section p {
+  line-height: 1.8;
+}
+section p span {
+  line-height: 1.1;
+}

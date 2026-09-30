@@ -4,7 +4,7 @@ A beautiful liquid glass distortion effect component for React that creates stun
 
 Vaso is the React version of [shuding](https://github.com/shuding)'s [Liquid Glass](https://github.com/shuding/liquid-glass) implementation.
 
-![image](./site/app/opengraph-image.png)
+![image](./site/opengraph-image.png)
 
 ## Installation
 

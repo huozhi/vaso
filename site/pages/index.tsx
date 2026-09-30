@@ -1,12 +1,13 @@
 'use client'
 
-import { Vaso, type VasoProps } from '../../src'
-import { Switcher } from './switcher'
+import { Vaso, type VasoProps } from 'vaso'
+import { Switcher } from '../components/switcher'
 import { HoverCodeGlass } from '../components/hover-vaso'
-import { useGlassContext } from '../contexts/glass-context'
+import { GlassProvider, useGlassContext } from '../contexts/glass-context'
 import { useRef, useState, useEffect, useCallback, startTransition } from 'react'
 
-import './page.css'
+import '../styles/globals.css'
+import '../styles/page.css'
 import { useSpring } from '@react-spring/web'
 
 // Browser support detection
@@ -53,14 +54,14 @@ function BrowserWarning() {
       <div className="bg-yellow-100/80 backdrop-blur-xl h-full shadow-[0_8px_32px_rgba(0,0,0,0.1)] border-b border-yellow-200/50 px-4">
         <div className="max-w-7xl mx-auto h-full flex items-center justify-between">
           {/* Content */}
-          <p className="text-sm text-gray-700 dark:text-gray-800">Your browser doesn't support refraction yet, showing frosted glass fallback</p>
+          <p className="text-sm text-gray-700">Your browser doesn't support refraction yet, showing frosted glass fallback</p>
 
           {/* Close button */}
           <button
             onClick={() => setShowWarning(false)}
-            className="ml-4 p-1.5 rounded-full bg-transparent dark:bg-gray-700/50 dark:hover:bg-gray-700/70 transition-colors"
+            className="ml-4 p-1.5 rounded-full bg-transparent transition-colors"
           >
-            <svg className="w-4 h-4 text-gray-500 dark:text-gray-700" fill="currentColor" viewBox="0 0 20 20">
+            <svg className="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
               <path
                 fillRule="evenodd"
                 d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
@@ -778,13 +779,20 @@ function DraggableGlassDemo() {
   )
 }
 
-export default function Page() {
+function Home() {
   const [theme, setTheme] = useState('light')
 
   return (
     <>
+      <title>Vaso</title>
+      <meta name="description" content="Glass Effect for React" />
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap"
+        precedence="default"
+      />
 
       <div
         className="min-h-screen lg:p-8 lg:pt-22 lg:pb-32 p-2 pt-[calc(2rem+30px)] pb-8 root"
@@ -920,5 +928,13 @@ export default function Page() {
         </div>
       </div>
     </>
+  )
+}
+
+export default function Page() {
+  return (
+    <GlassProvider>
+      <Home />
+    </GlassProvider>
   )
 }

@@ -264,19 +264,22 @@ const Vaso: React.FC<VasoProps> = ({
 }) => {
   const filterId = `vaso-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`
   const wrapperRef = useRef<HTMLElement>(null)
+  const containerRef = useRef<HTMLElement>(null)
   const svgSupported = useSyncExternalStore(subscribeNoop, getSvgBackdropSupport, getServerSupport)
   const [geometry, setGeometry] = useState<Geometry | null>(null)
 
   useIsomorphicLayoutEffect(() => {
     const wrapper = wrapperRef.current
-    if (!wrapper) return
+    const container = containerRef.current
+    if (!wrapper || !container) return
 
     const measure = () => {
       // offsetWidth/Height ignore CSS transforms, matching the filter's local coordinates
       const finalWidth = Math.max(1, (width ?? wrapper.offsetWidth) + 2 * px)
       const finalHeight = Math.max(1, (height ?? wrapper.offsetHeight) + 2 * py)
-      const inheritedRadius = parseFloat(getComputedStyle(wrapper).borderTopLeftRadius) || 0
-      const finalRadius = Math.min(radius ?? inheritedRadius, finalWidth / 2, finalHeight / 2)
+      // The container either has the explicit radius or inherits the element's CSS radius
+      const cssRadius = parseFloat(getComputedStyle(container).borderTopLeftRadius) || 0
+      const finalRadius = Math.min(cssRadius, finalWidth / 2, finalHeight / 2)
 
       setGeometry((prev) => {
         if (
@@ -317,8 +320,6 @@ const Vaso: React.FC<VasoProps> = ({
     : // Without refraction, lean on frosting so the glass still reads as glass
       `blur(${Math.min(blur + 4 * Math.abs(depth), 12)}px) saturate(1.5)`
 
-  const containerRadius = radius ?? geometry?.radius
-
   return (
     <WrapComponent
       {...htmlProps}
@@ -328,6 +329,8 @@ const Vaso: React.FC<VasoProps> = ({
     >
       <WrapComponent
         data-vaso={filterId}
+        // @ts-expect-error: dynamic ref assignment, improve this ref type later
+        ref={containerRef}
         style={{
           position: 'absolute',
           top: -py,
@@ -338,7 +341,8 @@ const Vaso: React.FC<VasoProps> = ({
           backdropFilter,
           WebkitBackdropFilter: backdropFilter,
           boxShadow: createSpecularShadow(specular),
-          ...(containerRadius !== undefined && { borderRadius: containerRadius }),
+          // Inherit so CSS radius changes (late stylesheets, toggled classes) apply without re-measuring
+          borderRadius: radius ?? 'inherit',
           cursor: 'default',
           userSelect: 'none',
           pointerEvents: 'none', // Allow clicks to pass through to content
