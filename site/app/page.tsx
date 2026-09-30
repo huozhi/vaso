@@ -53,7 +53,7 @@ function BrowserWarning() {
       <div className="bg-yellow-100/80 backdrop-blur-xl h-full shadow-[0_8px_32px_rgba(0,0,0,0.1)] border-b border-yellow-200/50 px-4">
         <div className="max-w-7xl mx-auto h-full flex items-center justify-between">
           {/* Content */}
-          <p className="text-sm text-gray-700 dark:text-gray-800">Browser not fully supported</p>
+          <p className="text-sm text-gray-700 dark:text-gray-800">Your browser doesn't support refraction yet, showing frosted glass fallback</p>
 
           {/* Close button */}
           <button
@@ -85,7 +85,7 @@ function CodeGlass({ children, ...props }: { children: React.ReactNode } & VasoP
       radius={settings.radius}
       blur={settings.blur}
       depth={settings.depth}
-      dispersion={settings.dispersion / 2}
+      dispersion={settings.dispersion}
       {...props}
     >
       {children}
@@ -93,77 +93,64 @@ function CodeGlass({ children, ...props }: { children: React.ReactNode } & VasoP
   )
 }
 
+// How far the title glass can be dragged away from its resting spot over the title
+const TITLE_DRAG_LIMIT = { x: 72, y: 28 }
+
 function VasoTitle() {
   const { settings } = useGlassContext()
-  const isHovering = useRef(false)
+  const [offset, setOffset] = useState({ x: 0, y: 0 })
+  const [isDragging, setIsDragging] = useState(false)
+  const dragStartRef = useRef({ pointer: { x: 0, y: 0 }, offset: { x: 0, y: 0 } })
 
-  // Local state for values (defaulting to settings)
-  const [values, setValues] = useState({
-    depth: Math.max(1.1, settings.depth),
-    dispersion: settings.dispersion * 1.2
-  })
-
-  // Update local state when settings change (if not hovering)
-  useEffect(() => {
-    if (!isHovering.current) {
-      setValues({
-        depth: Math.max(1.1, settings.depth),
-        dispersion: settings.dispersion * 1.2,
-      })
-    }
-  }, [settings])
+  const handlePointerDown = (e: React.PointerEvent) => {
+    e.preventDefault()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    dragStartRef.current = { pointer: { x: e.clientX, y: e.clientY }, offset }
+    setIsDragging(true)
+  }
 
   const handlePointerMove = (e: React.PointerEvent) => {
-    isHovering.current = true
-    const rect = e.currentTarget.getBoundingClientRect()
-    // normalized -0.5 to 0.5
-    const x = (e.clientX - rect.left) / rect.width - 0.5
-    const y = (e.clientY - rect.top) / rect.height - 0.5
-
-    const baseDepth = Math.max(1.1, settings.depth)
-    const baseDispersion = settings.dispersion * 1.2
-
-    // Interact effect:
-    // Moving mouse changes depth and dispersion to simulate luster/shifting light
-    const targetDepth = Math.max(0, baseDepth + y * 2)
-    const targetDispersion = Math.max(0, baseDispersion + Math.abs(x) * 3)
-
-    setValues({
-      depth: targetDepth,
-      dispersion: targetDispersion
+    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return
+    const { pointer, offset: start } = dragStartRef.current
+    const clamp = (value: number, limit: number) => Math.max(-limit, Math.min(limit, value))
+    setOffset({
+      x: clamp(start.x + e.clientX - pointer.x, TITLE_DRAG_LIMIT.x),
+      y: clamp(start.y + e.clientY - pointer.y, TITLE_DRAG_LIMIT.y),
     })
   }
 
-  const handlePointerLeave = () => {
-    isHovering.current = false
-    const baseDepth = Math.max(1.1, settings.depth)
-    const baseDispersion = settings.dispersion * 1.2
-
-    setValues({
-      depth: baseDepth,
-      dispersion: baseDispersion
-    })
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId)
+    }
+    setIsDragging(false)
   }
 
   return (
-    <div
-      className="inline-block cursor-pointer"
-      onPointerMove={handlePointerMove}
-      onPointerLeave={handlePointerLeave}
-      style={{ touchAction: 'none' }} // Prevent scrolling while interacting on touch
-    >
+    <span className="relative inline-block">
+      <span>{'Vaso'}</span>
+      {/* The glass floats over the static title text so the refraction shows while dragging across it */}
       <Vaso
         component="span"
-        px={36}
-        py={8}
         radius={settings.radius * 4}
-        depth={values.depth}
+        // Lift the glass a little while it's being held
+        depth={Math.max(2.4, settings.depth * 3) + (isDragging ? 0.6 : 0)}
         blur={settings.blur}
-        dispersion={values.dispersion}
-      >
-        <span>{'Vaso'}</span>
-      </Vaso>
-    </div>
+        dispersion={settings.dispersion * 1.2}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        style={{
+          position: 'absolute',
+          // Size the element itself to the glass so the whole glass is grabbable
+          inset: '-8px -36px',
+          transform: `translate(${offset.x}px, ${offset.y}px)`,
+          cursor: isDragging ? 'grabbing' : 'grab',
+          touchAction: 'none', // Prevent scrolling while dragging on touch
+        }}
+      />
+    </span>
   )
 }
 
@@ -256,6 +243,7 @@ function VasoSlider({
   step: number
   onChange: (value: number) => void
 }) {
+  const { settings } = useGlassContext()
   const [isDragging, setIsDragging] = useState(false)
   const [trackWidth, setTrackWidth] = useState(0)
   const trackRef = useRef<HTMLDivElement>(null)
@@ -348,7 +336,7 @@ function VasoSlider({
           radius={999}
           depth={4}
           blur={0.2}
-          dispersion={0}
+          dispersion={settings.dispersion}
           className={`vaso-slider-thumb transition-all duration-100 ease-out pointer-events-none ${
             isDragging ? 'scale-110' : 'hover:scale-105'
           }`}
@@ -472,6 +460,7 @@ function ThemeSwitcherDemo({ theme, setTheme }: { theme: string; setTheme: (them
 }
 
 function WaterFlowDemo() {
+  const { settings } = useGlassContext()
   const bgUrl =
     'https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExZG1wZWU5azNrYmV3NXJ1enplbDFoMXR2ZXV5MWE2bm5yMnU1MHhrdyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/EzUMaltmsbK3G1Y5Ow/giphy.gif'
   const [frostedGlass, setFrostedGlass] = useState(false)
@@ -507,7 +496,7 @@ function WaterFlowDemo() {
             radius={20}
             depth={factor * 2}
             blur={factor * 1.2}
-            dispersion={factor * 0.1}
+            dispersion={settings.dispersion * factor}
             className="top-0 left-0 w-full h-full rounded-full overflow-hidden"
           ></Vaso>
 
@@ -570,7 +559,7 @@ function WaterFlowDemo() {
               height={36}
               radius={20}
               depth={frostedGlass ? 2 : 0.5}
-              dispersion={0}
+              dispersion={settings.dispersion}
               blur={0.3}
               className={`transform transition-transform translate-y-1/2 ${
                 frostedGlass ? 'translate-x-4' : '-translate-x-4'
@@ -584,6 +573,7 @@ function WaterFlowDemo() {
 }
 
 function DraggableGlassDemo() {
+  const { settings } = useGlassContext()
   const [position, setPosition] = useState({ x: 100, y: 60 })
   const [glassIntensity, setGlassIntensity] = useState(0.5)
   const dragStartRef = useRef({ pointer: { x: 0, y: 0 }, position: { x: 0, y: 0 } })
@@ -735,7 +725,7 @@ function DraggableGlassDemo() {
             radius={glassSize / 2}
             depth={1 + glassIntensity * 3}
             blur={0.1 + glassIntensity * 0.3}
-            dispersion={glassIntensity * 0.8}
+            dispersion={settings.dispersion * (1 + glassIntensity)}
             className="w-full h-full"
           >
             <div className="w-full h-full rounded-full bg-transparent" />
@@ -774,7 +764,7 @@ function DraggableGlassDemo() {
                 height={24}
                 radius={12}
                 depth={1 + glassIntensity * 2}
-                dispersion={0}
+                dispersion={settings.dispersion}
                 blur={0.3}
                 className="w-full h-full"
               >
@@ -805,7 +795,7 @@ export default function Page() {
           <header className="mb-8 flex items-center justify-between mobile-header">
             <div className="max-w-sm mobile-title">
               <h1 className="text-[88px] font-bold mb-12 mobile-h1 user-select-none theme-title">
-                <small className="mobile-h1-small font-light mr-8 theme-subtitle">{'El '}</small>
+                <small className="mobile-h1-small font-light mr-8 theme-subtitle"></small>
                 <VasoTitle />
               </h1>
               <p className="text-lg theme-description">Liquid Glass Effect for React</p>

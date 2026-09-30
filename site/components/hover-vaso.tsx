@@ -4,6 +4,7 @@ import React, { useEffect } from 'react'
 import { useState } from 'react'
 import { useSpring } from '@react-spring/web'
 import { Vaso, VasoProps } from "../../src"
+import { useGlassContext } from "../contexts/glass-context"
 
 type HoverCodeGlassProps = VasoProps<HTMLSpanElement>
 
@@ -11,6 +12,7 @@ export function HoverCodeGlass({
   children, 
   ...props 
 }: HoverCodeGlassProps) {
+  const { settings } = useGlassContext()
   const [isTouching, setIsTouching] = useState(true)
   const [isHovered, setIsHovered] = useState(isTouching ? true : false)
   const [currentBlur, setCurrentBlur] = useState(isTouching ? 0 : 4)
@@ -47,6 +49,7 @@ export function HoverCodeGlass({
       depth={0}
       radius={6}
       blur={currentBlur}
+      dispersion={settings.dispersion}
       {...props}
     >
       {children}

@@ -46,14 +46,17 @@ function App() {
 | `height` | `number` | `undefined` | - | Explicit height of the glass element (overrides child element size) |
 | `px` | `number` | `0` | `0-100` | Horizontal padding around the glass effect |
 | `py` | `number` | `0` | `0-100` | Vertical padding around the glass effect |
-| `radius` | `number` | `0` | `0-∞` | Border radius of the glass container |
-| `depth` | `number` | `0.4` | `-2.0 to 2.0` | Distortion scale intensity (negative values create compression) |
+| `radius` | `number` | inherited | `0-∞` | Border radius of the glass. Defaults to the element's computed `border-radius`, so classes like `rounded-full` just work |
+| `depth` | `number` | `0` | `-5.0 to 5.0` | Refraction strength at the bezel (negative values create a concave, compressing glass) |
+| `blur` | `number` | `0.1` | `0-10` | Backdrop blur in pixels |
+| `dispersion` | `number \| false` | `0.5` | `0-3.0` | Spectral (rainbow) dispersion along the refracting edge, like Figma's glass. Scales with the glass size and fades out as `depth` approaches 0 |
+| `specular` | `number \| false` | `0.5` | `0-1.0` | Intensity of the specular rim highlight |
 
-### Negative Values Support
+### Browser Support
 
-Vaso supports negative values for several parameters to create inverted effects:
+The refraction is rendered with an SVG filter inside `backdrop-filter`, which is currently only supported by Chromium based browsers (Chrome, Edge, Arc, Opera, ...).
 
-- **`depth`** (`-2.0 to 2.0`): Negative values create compression instead of magnification
+In Safari and Firefox, Vaso detects the missing support and falls back to a frosted glass (backdrop blur, saturation and the specular rim) instead of rendering nothing.
 
 ## Examples
 
