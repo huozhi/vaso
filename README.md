@@ -2,8 +2,6 @@
 
 A beautiful liquid glass distortion effect component for React that creates stunning visual magnification and warping effects.
 
-Vaso is the React version of [shuding](https://github.com/shuding)'s [Liquid Glass](https://github.com/shuding/liquid-glass) implementation.
-
 ![image](./site/opengraph-image.png)
 
 ## Installation

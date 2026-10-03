@@ -1,33 +1,30 @@
 'use client'
 
-import { Vaso, type VasoProps } from 'vaso'
+import { Vaso } from 'vaso'
 import { Switcher } from '../components/switcher'
-import { HoverCodeGlass } from '../components/hover-vaso'
-import { GlassProvider, useGlassContext } from '../contexts/glass-context'
+import {
+  GLASS_SCOPE_ATTRIBUTE,
+  GLASS_SCOPE_LABEL_ATTRIBUTE,
+  GlassProvider,
+  GlassScope,
+  useGlassContext,
+  useGlassScopeAttributes,
+  useGlassStore,
+  useGlassTuning,
+} from '../contexts/glass-context'
+import { SegmentedControl } from '../components/segmented-control'
+import { FloatingGlass, glassTarget } from '../components/floating-glass'
+import { useDragPhysics } from '../components/use-drag-physics'
+import { ToastStack } from '../components/toast-stack'
+import { FrostedCard } from '../components/frosted-card'
+import { ColorPicker } from '../components/color-picker'
+import { CodeBlock } from '../components/code-block'
+import { SiteFooter } from '../components/site-footer'
 import { useRef, useState, useEffect, useLayoutEffect, useCallback, startTransition } from 'react'
+import { createPortal } from 'react-dom'
 
 import '../styles/globals.css'
 import '../styles/page.css'
-import { useSpring } from '@react-spring/web'
-
-function CodeGlass({ children, ...props }: { children: React.ReactNode } & VasoProps<HTMLSpanElement>) {
-  const { settings } = useGlassContext()
-
-  return (
-    <Vaso
-      component="span"
-      px={settings.px}
-      py={settings.py}
-      radius={settings.radius}
-      blur={settings.blur}
-      depth={settings.depth}
-      dispersion={settings.dispersion}
-      {...props}
-    >
-      {children}
-    </Vaso>
-  )
-}
 
 // How far the title glass can be dragged away from its resting spot over the title
 const TITLE_DRAG_LIMIT = { x: 72, y: 28 }
@@ -145,6 +142,7 @@ function IconGridDemo() {
   const [vasoWidth, setVasoWidth] = useState(DEFAULT_VASO_WIDTH) // Direct width control
   const [isDragging, setIsDragging] = useState(false)
   const { settings } = useGlassContext()
+  const tuning = useGlassTuning()
 
   return (
     <div className="relative theme-text-bg rounded-xl p-2 w-80 max-w-full">
@@ -172,7 +170,7 @@ function IconGridDemo() {
           <Vaso
             width={vasoWidth}
             height={vasoHeight}
-            depth={0.6}
+            depth={0.6 + tuning.depth}
             // Frostier and more colorful than the global settings, while still following the panel
             blur={settings.blur + 0.5}
             dispersion={settings.dispersion + 0.5}
@@ -250,7 +248,7 @@ function VasoSlider({
   onChange: (value: number) => void
 }) {
   const { settings } = useGlassContext()
-  const [isDragging, setIsDragging] = useState(false)
+  const thumb = useDragPhysics()
   const [trackWidth, setTrackWidth] = useState(0)
   const trackRef = useRef<HTMLDivElement>(null)
 
@@ -294,7 +292,7 @@ function VasoSlider({
           onPointerDown={(e) => {
             e.preventDefault()
             e.stopPropagation()
-            setIsDragging(true)
+            thumb.start(e.clientX)
 
             // Capture the pointer to track movement even outside the thumb
             // This allows smooth dragging without losing tracking if cursor moves fast
@@ -306,6 +304,7 @@ function VasoSlider({
 
             const handlePointerMove = (e: PointerEvent) => {
               e.preventDefault()
+              thumb.move(e.clientX)
               const currentTrackWidth = trackRef.current?.clientWidth || trackWidth
               const deltaX = e.clientX - startX
               const deltaPercentage = (deltaX / Math.max(1, currentTrackWidth - thumbSize)) * 100
@@ -320,7 +319,7 @@ function VasoSlider({
             }
 
             const handlePointerUp = (e: PointerEvent) => {
-              setIsDragging(false)
+              thumb.end()
               // Release pointer capture to end the drag interaction
               target.releasePointerCapture(e.pointerId)
               target.removeEventListener('pointermove', handlePointerMove)
@@ -339,12 +338,12 @@ function VasoSlider({
           width={thumbSize}
           height={thumbSize}
           radius={999}
-          depth={4}
+          depth={4 + thumb.press * 2}
           blur={0.2}
-          dispersion={settings.dispersion}
-          className={`vaso-slider-thumb transition-all duration-100 ease-out pointer-events-none ${
-            isDragging ? 'scale-110' : 'hover:scale-105'
-          }`}
+          dispersion={settings.dispersion + thumb.press * 0.6}
+          className="vaso-slider-thumb pointer-events-none"
+          // Clear while held, so the swollen glass shows the track through it
+          style={{ transform: thumb.transform, backgroundColor: thumb.press > 0.05 ? 'transparent' : undefined }}
         >
           <div
             className="w-full h-full rounded-full pointer-events-none"
@@ -367,17 +366,23 @@ const GLASS_ATTRIBUTES = [
 const PANEL_TRIGGER_EXCLUDE =
   'a, button, input, textarea, select, label, [role="button"], [role="switch"], [data-glass-panel]'
 
-// Hit-test the glass layers themselves: they ignore pointer events and can overhang their element (px/py)
+// Hit-test the glass layers themselves: they ignore pointer events and can overhang their element (px/py).
+// Only glass in a tunable demo counts
 function getGlassAt(target: EventTarget | null, x: number, y: number) {
   if (target instanceof Element && target.closest(PANEL_TRIGGER_EXCLUDE)) return null
   return (
     Array.from(document.querySelectorAll('[data-vaso]')).find((glass) => {
-      if (glass.closest('[data-glass-panel]')) return false
+      if (glass.closest('[data-glass-panel]') || !glass.closest(`[${GLASS_SCOPE_ATTRIBUTE}]`)) return false
       const rect = glass.getBoundingClientRect()
       return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
     }) ?? null
   )
 }
+function scopeOf(glass: Element) {
+  const scope = glass.closest(`[${GLASS_SCOPE_ATTRIBUTE}]`)!
+  return { id: scope.getAttribute(GLASS_SCOPE_ATTRIBUTE)!, label: scope.getAttribute(GLASS_SCOPE_LABEL_ATTRIBUTE)! }
+}
+
 const DOUBLE_CLICK_MS = 300
 const DOUBLE_CLICK_MOVE_TOLERANCE = 5
 const LONG_PRESS_MS = 500
@@ -386,8 +391,9 @@ const PANEL_MARGIN = 12
 const SCROLL_CLOSE_DISTANCE = 8
 
 function GlassPanel() {
-  const { settings, updateSettings } = useGlassContext()
-  const [anchor, setAnchor] = useState<{ x: number; y: number } | null>(null)
+  const { settingsFor, updateSettingsFor } = useGlassStore()
+  // Where the panel opened, and the demo whose glass it tunes
+  const [anchor, setAnchor] = useState<{ x: number; y: number; scope: { id: string; label: string } } | null>(null)
   const [position, setPosition] = useState<{ left: number; top: number; origin: string } | null>(null)
   const panelRef = useRef<HTMLDivElement>(null)
 
@@ -409,14 +415,14 @@ function GlassPanel() {
         if (!previous.glass || previous.glass !== getGlassAt(e.target, e.clientX, e.clientY)) return
         // Drop the word selection the double click makes
         requestAnimationFrame(() => window.getSelection()?.removeAllRanges())
-        setAnchor({ x: e.clientX, y: e.clientY })
+        setAnchor({ x: e.clientX, y: e.clientY, scope: scopeOf(previous.glass) })
         return
       }
       lastMousePress = { time: e.timeStamp, x: e.clientX, y: e.clientY, glass: getGlassAt(e.target, e.clientX, e.clientY) }
     }
 
     let pressTimer: ReturnType<typeof setTimeout> | undefined
-    let pressStart: { x: number; y: number } | null = null
+    let pressStart: { x: number; y: number; glass: Element } | null = null
     const cancelPress = () => {
       clearTimeout(pressTimer)
       pressStart = null
@@ -433,14 +439,15 @@ function GlassPanel() {
 
     const handlePointerDown = (e: PointerEvent) => {
       if (e.pointerType === 'mouse') return handleMousePress(e)
-      if (!getGlassAt(e.target, e.clientX, e.clientY)) return
-      pressStart = { x: e.clientX, y: e.clientY }
+      const glass = getGlassAt(e.target, e.clientX, e.clientY)
+      if (!glass) return
+      pressStart = { x: e.clientX, y: e.clientY, glass }
       clearTimeout(pressTimer)
       pressTimer = setTimeout(() => {
         if (!pressStart) return
         navigator.vibrate?.(10)
         suppressNextClick()
-        setAnchor(pressStart)
+        setAnchor({ x: pressStart.x, y: pressStart.y, scope: scopeOf(pressStart.glass) })
         pressStart = null
       }, LONG_PRESS_MS)
     }
@@ -532,6 +539,7 @@ function GlassPanel() {
   }, [anchor])
 
   if (!anchor) return null
+  const settings = settingsFor(anchor.scope.id)
 
   return (
     <div
@@ -553,6 +561,7 @@ function GlassPanel() {
       <Vaso radius={20} depth={0.3} blur={6} dispersion={0} className="rounded-[20px]">
         {/* Positioned so the content paints above the glass layer instead of being refracted by it */}
         <div className="relative grid grid-cols-2 gap-x-5 gap-y-4 px-5 py-4 rounded-[20px] text-xs theme-controls theme-controls-text">
+          <div className="col-span-2 font-semibold theme-controls-title">{anchor.scope.label}</div>
           {GLASS_ATTRIBUTES.map(({ key, label, min, max, step }) => (
             <div key={key}>
               <div className="flex items-center justify-between mb-1.5">
@@ -564,7 +573,7 @@ function GlassPanel() {
                 min={min}
                 max={max}
                 step={step}
-                onChange={(value) => updateSettings({ [key]: value })}
+                onChange={(value) => updateSettingsFor(anchor.scope.id, { [key]: value })}
               />
             </div>
           ))}
@@ -576,7 +585,7 @@ function GlassPanel() {
 
 function ThemeSwitcherDemo({ theme, setTheme }: { theme: string; setTheme: (theme: string) => void }) {
   return (
-    <div className="flex flex-col gap-3 items-start mt-6">
+    <div className="flex flex-col gap-3 items-start">
       <div className="flex justify-start">
         <Switcher
           xOption={{
@@ -617,211 +626,75 @@ function ThemeSwitcherDemo({ theme, setTheme }: { theme: string; setTheme: (them
   )
 }
 
-const FROSTED_VIDEO_SPEED = 2
+const LENS_SIZE = 120
+// How far the lens may hang over the page edges
+const LENS_OVERFLOW = 24
 
-function WaterFlowDemo() {
-  const { settings } = useGlassContext()
-  // The MP4 version of the GIF, so the playback speed can be changed
-  const videoUrl = 'https://media1.giphy.com/media/EzUMaltmsbK3G1Y5Ow/giphy.mp4'
-  const [frostedGlass, setFrostedGlass] = useState(true)
-  // 0 = clear glass, 1 = frosted; animated between the two
-  const [frost, setFrost] = useState(1)
-  const videoRef = useRef<HTMLVideoElement>(null)
-
-  // Metadata can load before hydration attaches onLoadedMetadata, so also apply the rate on mount
-  useEffect(() => {
-    if (videoRef.current) videoRef.current.playbackRate = FROSTED_VIDEO_SPEED
-  }, [])
-  useSpring({
-    frost: frostedGlass ? 1 : 0,
-    config: {
-      tension: 170,
-      friction: 26,
-      duration: 220,
-    },
-    easing: 'easeInOutCubic',
-    onChange: ({ value }) => {
-      setFrost(value.frost)
-    },
-  })
-  return (
-    <div className="flex flex-col items-center gap-6">
-      {/* Background Container (larger) */}
-      <div className="relative w-72 h-30 rounded-3xl overflow-hidden shadow-2xl">
-        {/* Background video (fills entire container) */}
-        <video
-          ref={videoRef}
-          className="absolute inset-0 w-full h-full object-cover"
-          src={videoUrl}
-          autoPlay
-          muted
-          loop
-          playsInline
-          // Loading media resets the rate, so apply it again once metadata is ready
-          onLoadedMetadata={(e) => {
-            e.currentTarget.playbackRate = FROSTED_VIDEO_SPEED
-          }}
-        />
-
-        {/* Dynamic Island (centered, smaller) */}
-        <div className="absolute top-1/3 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-50 h-12 overflow-hidden">
-          {/* Vaso Glass Effect (only over island) */}
-          <Vaso
-            radius={20}
-            // Clear: crisp and strongly refracting. Frosted: heavily blurred with a brighter rim
-            depth={2.4 - frost * 1.2}
-            blur={0.3 + frost * 5.7}
-            specular={0.5 + frost * 0.4}
-            dispersion={settings.dispersion * (1 - frost * 0.5)}
-            className="top-0 left-0 w-full h-full rounded-full overflow-hidden"
-          ></Vaso>
-
-          {/* Icons (always on top) */}
-          {/* The frosted tint sits above the glass with the icons, so it looks the same in every browser */}
-          <div
-            className="absolute inset-0 flex items-center justify-between rounded-full text-[#fff]"
-            style={{ backgroundColor: `rgba(255, 255, 255, ${frost * 0.18})` }}
-          >
-            {/* Back Arrow */}
-            <button className="p-3 rounded-full transition-colors">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path
-                  d="M19 12H5M12 19l-7-7 7-7"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
-
-            {/* Folder */}
-            <button className="p-3 rounded-full transition-colors">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path
-                  d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
-
-            {/* Trash */}
-            <button className="p-3 rounded-full transition-colors">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path
-                  d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14zM10 11v6M14 11v6"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Toggle Control */}
-      <div className="flex items-center justify-center gap-4 w-64 rounded-xl">
-        <span className="text-sm font-medium theme-controls-title mr-4">Frosted</span>
-        <button
-          onClick={() => setFrostedGlass(!frostedGlass)}
-          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-            frostedGlass ? 'bg-[#e3a75a]' : 'bg-[#bcbeb3]'
-          }`}
-        >
-          <span className="absolute top-1/2 left-1/2 -translate-y-[50%] -translate-x-1/2 w-[56px] h-[36px]">
-            <Vaso
-              width={56}
-              height={36}
-              radius={20}
-              depth={frostedGlass ? 2 : 0.5}
-              dispersion={settings.dispersion}
-              blur={0.3}
-              className={`transform transition-transform translate-y-1/2 ${
-                frostedGlass ? 'translate-x-4' : '-translate-x-4'
-              }`}
-            />
-          </span>
-        </button>
-      </div>
-    </div>
-  )
-}
-
+// A lens that starts over the photo and can be dragged anywhere on the page. It's portaled to the body and
+// positioned in page coordinates, so it scrolls with the content it sits on
 function DraggableGlassDemo() {
   const { settings } = useGlassContext()
-  const [position, setPosition] = useState({ x: 100, y: 60 })
+  const tuning = useGlassTuning()
+  // The lens is portaled out of the demo, so it carries the demo's scope itself
+  const scopeAttributes = useGlassScopeAttributes()
+  // Center of the lens in page coordinates; null until it's anchored to the photo after mount
+  const [position, setPosition] = useState<{ x: number; y: number } | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
   const [glassIntensity, setGlassIntensity] = useState(0.5)
   const dragStartRef = useRef({ pointer: { x: 0, y: 0 }, position: { x: 0, y: 0 } })
-  const containerRef = useRef<HTMLDivElement>(null)
+  // Until the lens is first dragged, it follows the photo through layout changes
+  const movedRef = useRef(false)
+  const photoRef = useRef<HTMLDivElement>(null)
   const sliderRef = useRef<HTMLDivElement>(null)
+  const thumb = useDragPhysics()
 
-  const glassSize = 120
-  const overflowGap = 24
+  useLayoutEffect(() => {
+    const anchor = () => {
+      const photo = photoRef.current
+      if (movedRef.current || !photo) return
+      const rect = photo.getBoundingClientRect()
+      setPosition({ x: rect.left + window.scrollX + rect.width * 0.35, y: rect.top + window.scrollY + rect.height / 2 })
+    }
+    anchor()
+    const observer = new ResizeObserver(anchor)
+    observer.observe(document.body)
+    return () => observer.disconnect()
+  }, [])
 
-  // Glass drag handlers - all using React synthetic events
   const handleGlassPointerDown = useCallback(
     (e: React.PointerEvent) => {
+      if (!position) return
       e.preventDefault()
-      const target = e.currentTarget as HTMLElement
-
-      // Capture all pointer events to this element until released
-      // This ensures we continue receiving pointermove events even when
-      // the pointer moves outside the element boundaries (e.g. fast dragging)
-      // Without this, the drag would stop when cursor leaves the element
-      target.setPointerCapture(e.pointerId)
-
-      // Store initial pointer position and element position for delta calculations
-      dragStartRef.current = {
-        pointer: { x: e.clientX, y: e.clientY },
-        position: { x: position.x, y: position.y },
-      }
+      // Capture the pointer so fast drags keep tracking outside the lens
+      e.currentTarget.setPointerCapture(e.pointerId)
+      dragStartRef.current = { pointer: { x: e.clientX, y: e.clientY }, position }
+      movedRef.current = true
+      setIsDragging(true)
     },
     [position]
   )
 
   const handleGlassPointerMove = useCallback((e: React.PointerEvent) => {
-    // Only handle move events if we're actively capturing this pointer
-    // This prevents processing moves when not dragging
     if (!e.currentTarget.hasPointerCapture(e.pointerId)) return
-
-    // Calculate new position based on pointer movement delta
-    const newPosition = {
-      x: dragStartRef.current.position.x + (e.clientX - dragStartRef.current.pointer.x),
-      y: dragStartRef.current.position.y + (e.clientY - dragStartRef.current.pointer.y),
+    const { pointer, position: start } = dragStartRef.current
+    // Keep the lens on the page
+    const page = document.documentElement
+    const min = LENS_SIZE / 2 - LENS_OVERFLOW
+    const next = {
+      x: Math.max(min, Math.min(page.scrollWidth - min, start.x + e.clientX - pointer.x)),
+      y: Math.max(min, Math.min(page.scrollHeight - min, start.y + e.clientY - pointer.y)),
     }
-
-    // Constrain to container bounds to keep glass visible
-    const containerRect = containerRef.current?.getBoundingClientRect()
-    if (containerRect) {
-      newPosition.x = Math.max(
-        glassSize / 2 - overflowGap,
-        Math.min(containerRect.width - glassSize / 2 + overflowGap, newPosition.x)
-      )
-      newPosition.y = Math.max(
-        glassSize / 2 - overflowGap,
-        Math.min(containerRect.height - glassSize / 2 + overflowGap, newPosition.y)
-      )
-    }
-
-    // Wrap in startTransition to prioritize pointer responsiveness over visual updates
-    // This keeps the drag smooth even if re-rendering the Vaso effect is expensive
+    // Keep pointer handling responsive even if re-rendering the glass is expensive
     startTransition(() => {
-      setPosition(newPosition)
+      setPosition(next)
     })
-  }, [glassSize, overflowGap])
+  }, [])
 
   const handleGlassPointerUp = useCallback((e: React.PointerEvent) => {
-    const target = e.currentTarget as HTMLElement
-    if (target.hasPointerCapture(e.pointerId)) {
-      // Release the pointer capture to return to normal event handling
-      // After this, pointer events will only fire when over the element again
-      target.releasePointerCapture(e.pointerId)
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId)
     }
+    setIsDragging(false)
   }, [])
 
   // Slider handlers - all using React synthetic events
@@ -832,6 +705,7 @@ function DraggableGlassDemo() {
     const target = e.currentTarget as HTMLElement
     // Capture pointer so slider keeps responding even if pointer moves outside track
     target.setPointerCapture(e.pointerId)
+    thumb.start(e.clientX)
 
     // Calculate intensity from click/touch position on slider track
     if (!sliderRef.current) return
@@ -846,6 +720,7 @@ function DraggableGlassDemo() {
   const handleSliderPointerMove = useCallback((e: React.PointerEvent) => {
     // Only update if we're actively dragging the slider
     if (!e.currentTarget.hasPointerCapture(e.pointerId)) return
+    thumb.move(e.clientX)
 
     // Recalculate intensity based on current pointer position
     if (!sliderRef.current) return
@@ -863,55 +738,57 @@ function DraggableGlassDemo() {
       // Release capture when done dragging slider
       target.releasePointerCapture(e.pointerId)
     }
+    thumb.end()
   }, [])
 
   return (
     <div className="flex flex-col items-center gap-4">
-      {/* Canvas container */}
-      <div className="relative w-[360px] h-[240px] p-8" ref={containerRef}>
-        {/* Background image */}
-        <div
-          className="relative w-full h-full bg-center rounded-3xl"
-          style={{
-            backgroundImage: `url(/flower.jpg)`,
-          }}
-        >
+      <div className="w-[296px] max-w-full h-[176px]">
+        <div ref={photoRef} className="relative w-full h-full bg-center rounded-3xl" style={{ backgroundImage: `url(/flower.jpg)` }}>
           {/* Instruction overlay */}
           <div className="absolute select-none top-4 left-4 bg-black/20 backdrop-blur-sm rounded-lg px-3 py-2">
-            <p className="text-xs text-white/90 font-medium">Drag the glass around</p>
+            <p className="text-xs text-white/90 font-medium">Drag the glass anywhere</p>
           </div>
         </div>
-
-        {/* Draggable glass element */}
-        <div
-          className="absolute"
-          style={{
-            left: position.x - glassSize / 2,
-            top: position.y - glassSize / 2,
-            width: glassSize,
-            height: glassSize,
-            cursor: 'grab',
-            userSelect: 'none',
-            touchAction: 'none',
-          }}
-          onPointerDown={handleGlassPointerDown}
-          onPointerMove={handleGlassPointerMove}
-          onPointerUp={handleGlassPointerUp}
-          onPointerCancel={handleGlassPointerUp}
-        >
-          <Vaso
-            width={glassSize}
-            height={glassSize}
-            radius={glassSize / 2}
-            depth={1 + glassIntensity * 3}
-            blur={0.1 + glassIntensity * 0.3}
-            dispersion={settings.dispersion * (1 + glassIntensity)}
-            className="w-full h-full"
-          >
-            <div className="w-full h-full rounded-full bg-transparent" />
-          </Vaso>
-        </div>
       </div>
+
+      {position &&
+        createPortal(
+          <div
+            {...scopeAttributes}
+            style={{
+              position: 'absolute',
+              left: position.x - LENS_SIZE / 2,
+              top: position.y - LENS_SIZE / 2,
+              width: LENS_SIZE,
+              height: LENS_SIZE,
+              // Above the page content and the header, so it can refract both
+              zIndex: 950,
+              cursor: isDragging ? 'grabbing' : 'grab',
+              userSelect: 'none',
+              touchAction: 'none',
+            }}
+            onPointerDown={handleGlassPointerDown}
+            onPointerMove={handleGlassPointerMove}
+            onPointerUp={handleGlassPointerUp}
+            onPointerCancel={handleGlassPointerUp}
+          >
+            <Vaso
+              width={LENS_SIZE}
+              height={LENS_SIZE}
+              radius={LENS_SIZE / 2}
+              // Lift the lens a little while it's being held
+              depth={1 + glassIntensity * 3 + tuning.depth + (isDragging ? 0.4 : 0)}
+              blur={settings.blur * 0.4 + glassIntensity * 0.3}
+              dispersion={settings.dispersion * (1 + glassIntensity)}
+              className="w-full h-full"
+              style={{ transform: `scale(${isDragging ? 1.04 : 1})`, transition: 'transform 120ms ease-out' }}
+            >
+              <div className="w-full h-full rounded-full bg-transparent" />
+            </Vaso>
+          </div>,
+          document.body,
+        )}
 
       {/* Glass Intensity Slider Control */}
       <div className="flex items-center justify-center gap-4 w-64 rounded-xl">
@@ -943,18 +820,58 @@ function DraggableGlassDemo() {
                 width={36}
                 height={24}
                 radius={12}
-                depth={1 + glassIntensity * 2}
-                dispersion={settings.dispersion}
+                // Bends harder as it swells under the finger
+                depth={1 + glassIntensity * 2 + thumb.press * 1.5}
+                dispersion={settings.dispersion + thumb.press * 0.6}
                 blur={0.3}
                 className="w-full h-full"
+                style={{ transform: thumb.transform }}
               >
-                <div className="w-full h-full rounded-full bg-white/20" />
+                {/* The white fill fades out while held, leaving clear glass over the track */}
+                <div
+                  className="w-full h-full rounded-full"
+                  style={{ backgroundColor: `rgba(255, 255, 255, ${0.2 * Math.max(0, 1 - thumb.press)})` }}
+                />
               </Vaso>
             </div>
           </div>
         </div>
       </div>
     </div>
+  )
+}
+
+const USAGE_CODE = `import { Vaso } from 'vaso'
+
+export function Toolbar() {
+  return (
+    <Vaso radius={24} depth={1.2} blur={0.5} dispersion={0.6} px={8} py={4}>
+      <button>Share</button>
+    </Vaso>
+  )
+}`
+
+function DemoCard({
+  title,
+  caption,
+  wide,
+  align = 'center',
+  children,
+}: {
+  title: string
+  caption?: string
+  wide?: boolean
+  align?: 'start' | 'center'
+  children: React.ReactNode
+}) {
+  return (
+    <figure className={`flex flex-col gap-5 min-w-0 ${wide ? 'md:col-span-2' : ''}`}>
+      <figcaption className={`text-xs theme-label ${align === 'center' ? 'text-center' : ''}`}>
+        <span className="font-semibold theme-heading">{title}</span>
+        {caption && <> · {caption}</>}
+      </figcaption>
+      <div className={`flex ${align === 'center' ? 'justify-center' : 'justify-start'}`}>{children}</div>
+    </figure>
   )
 }
 
@@ -974,16 +891,22 @@ function Home() {
       />
 
       <div
+        id="top"
         className="min-h-screen lg:p-8 lg:pt-22 lg:pb-32 p-2 pt-[calc(2rem+30px)] pb-8 root"
         data-theme={theme}
         style={{ fontFamily: "'JetBrains Mono', monospace" }}
       >
+
         <div className="max-w-3xl mx-auto">
-          <header className="mb-8 flex items-center justify-between mobile-header">
-            <div className="max-w-sm mobile-title">
+          <header className="relative mb-8 flex items-center justify-between mobile-header">
+            {/* Soft color glow behind the hero */}
+            <div aria-hidden className="hero-glow" />
+            <div className="relative max-w-sm mobile-title">
               <h1 className="text-[88px] font-bold mb-12 mobile-h1 user-select-none theme-title">
                 <small className="mobile-h1-small font-light mr-8 theme-subtitle"></small>
-                <VasoTitle />
+                <GlassScope id="title" label="Title">
+                  <VasoTitle />
+                </GlassScope>
               </h1>
               <p className="text-lg theme-description">Liquid Glass Effect for React</p>
             </div>
@@ -993,112 +916,88 @@ function Home() {
           <GlassPanel />
 
           <div className="px-4 py-6 lg:p-8 sm:p-4 space-y-8 rounded-lg theme-content">
-            <section className="relative border-b pb-4 theme-section">
-              <h2 className="text-lg font-semibold mb-4 theme-heading">Play</h2>
-              <div className="mt-2 relative border-t border-[var(--theme-border-color)] py-4">
-                {/* 2x2 Grid Layout */}
-                <div className="grid grid-cols-2 gap-4 md:gap-8">
-                  {/* Theme Switcher Example */}
-                  <div className="flex flex-col items-start">
+            <section id="examples" className="relative border-b pb-6 theme-section">
+              <h2 className="text-lg font-semibold mb-4 theme-heading">Examples</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-20 pt-8 border-t border-[var(--theme-border-color)]">
+                <DemoCard title="Theme switch" align="start">
+                  <GlassScope id="theme" label="Theme switch">
                     <ThemeSwitcherDemo theme={theme} setTheme={setTheme} />
-                  </div>
-
-                  {/* Icon Grid with Vaso Control Example */}
-                  <div className="flex flex-col items-start">
+                  </GlassScope>
+                </DemoCard>
+                <DemoCard title="Resizable glass" caption="drag the handle" align="start">
+                  <GlassScope id="resizable" label="Resizable glass">
                     <IconGridDemo />
-                  </div>
-
-                  {/* Draggable Glass Demo */}
-
-                  {/* Water Flow Demo - spans 2 columns */}
-                  <div className="col-span-2 flex flex-col justify-center pt-4 border-t border-[var(--theme-border-color)]">
-                    <div className="col-span-2 flex justify-center mb-12">
-                      <DraggableGlassDemo />
-                    </div>
-
-                    <div className="col-span-2 flex justify-center">
-                      <WaterFlowDemo />
-                    </div>
-                  </div>
-                </div>
+                  </GlassScope>
+                </DemoCard>
+                <DemoCard title="Lens" caption="drag it anywhere on the page" wide>
+                  <GlassScope id="lens" label="Lens">
+                    <DraggableGlassDemo />
+                  </GlassScope>
+                </DemoCard>
+                <DemoCard title="Frosted glass" caption="toggle frost on every glass" wide>
+                  <GlassScope id="frosted" label="Frosted glass">
+                    <FrostedCard />
+                  </GlassScope>
+                </DemoCard>
+                <DemoCard title="Segmented control" caption="the pill bounces into place" wide>
+                  <GlassScope id="segmented" label="Segmented control">
+                    <SegmentedControl />
+                  </GlassScope>
+                </DemoCard>
+                <DemoCard title="Color picker" caption="drag the lens around the wheel" wide>
+                  <GlassScope id="color" label="Color picker">
+                    <ColorPicker />
+                  </GlassScope>
+                </DemoCard>
+                <DemoCard title="Notification" wide>
+                  <GlassScope id="notification" label="Notification">
+                    <ToastStack />
+                  </GlassScope>
+                </DemoCard>
               </div>
             </section>
 
             <section className="border-b pb-4 theme-section">
               <h2 className="text-lg font-semibold mb-4 theme-heading">Installation</h2>
               <p className="mb-4 theme-text">
-                <CodeGlass depth={0} dispersion={1.2}>
-                  <code className="px-2 py-1 text-sm theme-text">npm install vaso</code>
-                </CodeGlass>
+                <FloatingGlass>
+                  <code {...glassTarget} className="text-sm font-bold theme-code">
+                    npm install vaso
+                  </code>
+                </FloatingGlass>
               </p>
             </section>
 
-            <section className="border-b pb-4 theme-section">
+            <section id="usage" className="border-b pb-4 theme-section">
               <h2 className="text-lg font-semibold mb-4 theme-heading">Usage</h2>
 
               <p className="mb-4 theme-text">
                 Import the{' '}
-                <CodeGlass>
-                  <code className="px-2 py-1 text-sm theme-text">{`<Vaso>`}</code>
-                </CodeGlass>{' '}
+                <FloatingGlass>
+                  <code {...glassTarget} className="text-sm font-bold theme-code">{`<Vaso>`}</code>
+                </FloatingGlass>{' '}
                 component in your React application and wrap it around any content you want to apply the glass effect
                 to.
               </p>
 
-              <p className="mb-4 theme-text">
-                Vaso provides intuitive props to control every aspect of the liquid glass effect. Use{' '}
-                <CodeGlass>
-                  <code className="px-2 py-1 text-sm theme-text">depth</code>
-                </CodeGlass>{' '}
-                to control distortion intensity,{' '}
-                <CodeGlass>
-                  <code className="px-2 py-1 text-sm theme-text">blur</code>
-                </CodeGlass>{' '}
-                for backdrop filtering,{' '}
-                <CodeGlass>
-                  <code className="px-2 py-1 text-sm theme-text">dispersion</code>
-                </CodeGlass>{' '}
-                for chromatic aberration effects, and{' '}
-                <CodeGlass>
-                  <code className="px-2 py-1 text-sm theme-text">radius</code>
-                </CodeGlass>{' '}
-                for rounded corners.
-              </p>
-              <p className="mb-4 theme-text">
-                Add spacing with{' '}
-                <CodeGlass>
-                  <code className="px-2 py-1 text-sm theme-text">px</code>
-                </CodeGlass>{' '}
-                and{' '}
-                <CodeGlass>
-                  <code className="px-2 py-1 text-sm theme-text">py</code>
-                </CodeGlass>{' '}
-                for padding, or enable{' '}
-                <CodeGlass>
-                  <code className="px-2 py-1 text-sm theme-text">draggable</code>
-                </CodeGlass>{' '}
-                to make the glass element interactive and moveable by users.
-              </p>
+              <div className="mb-6">
+                <CodeBlock filename="toolbar.tsx" code={USAGE_CODE} />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 theme-text">
+                <span>Tune it with</span>
+                <FloatingGlass className="inline-flex flex-wrap items-center gap-x-5 gap-y-3 py-3">
+                  {['depth', 'blur', 'dispersion', 'radius', 'specular'].map((prop) => (
+                    <code key={prop} {...glassTarget} className="text-sm font-bold theme-code">
+                      `{prop}`
+                    </code>
+                  ))}
+                </FloatingGlass>
+              </div>
             </section>
 
             <section>
-              <p className="theme-text">
-                <CodeGlass>
-                  <span className="font-bold p-1 rounded-md theme-author">huozhi</span>
-                </CodeGlass>
-                <span className="theme-text">{' • '}</span>
-                <HoverCodeGlass px={4} py={2} dispersion={0} radius={16}>
-                  <a href="https://x.com/huozhi" className="font-bold underline theme-link">
-                    <span className="font-bold p-1 rounded-md theme-author">X</span>
-                  </a>
-                </HoverCodeGlass>
-
-                {/* github link */}
-                <span className="theme-text">{' • '}</span>
-                <a href="https://github.com/huozhi/vaso" className="font-bold underline theme-link">
-                  GitHub
-                </a>
-              </p>
+              <SiteFooter />
             </section>
           </div>
         </div>

@@ -11,6 +11,9 @@ const IOR = 1.5
 const BEZEL_RATIO = 0.6
 // Displacement maps are smooth, so they can be rendered at a reduced resolution
 const MAX_MAP_PIXELS = 160_000
+// Size changes closer together than this count as one continuous resize. While resizing, the last displacement map
+// is stretched to the new size instead of drawing a new one, and a sharp map is drawn once the size settles
+const RESIZE_SETTLE_MS = 100
 // Peak displacement at the rim, as a fraction of the bezel width per unit of depth
 const REFRACTION = 0.35
 // Spread between the least and most refracted wavelengths, as a fraction of the bezel width
@@ -136,7 +139,14 @@ let mapCanvas: HTMLCanvasElement | undefined
 
 // `axisScale` pre-scales each axis of the field. objectBoundingBox displacement multiplies x by the
 // width and y by the height, so shrinking the longer axis here keeps the refraction isotropic.
-function getDisplacementMap(width: number, height: number, radius: number, bezel: number, axisScale = { x: 1, y: 1 }) {
+function getDisplacementMap(
+  width: number,
+  height: number,
+  radius: number,
+  bezel: number,
+  axisScale = { x: 1, y: 1 },
+  cachedOnly = false
+) {
   const res = Math.min(1, Math.sqrt(MAX_MAP_PIXELS / (width * height)))
   const w = Math.max(1, Math.round(width * res))
   const h = Math.max(1, Math.round(height * res))
@@ -149,6 +159,7 @@ function getDisplacementMap(width: number, height: number, radius: number, bezel
     mapCache.set(key, cached)
     return cached
   }
+  if (cachedOnly) return null
 
   mapCanvas ??= document.createElement('canvas')
   mapCanvas.width = w
@@ -259,7 +270,15 @@ function getSpectrum(samples: number) {
   return matrices
 }
 
-type Geometry = { width: number; height: number; radius: number; href: string; boundingBoxUnits: boolean }
+type Geometry = {
+  width: number
+  height: number
+  radius: number
+  href: string
+  boundingBoxUnits: boolean
+  /** The map was drawn for another size and is stretched to this one until the resize settles */
+  stale: boolean
+}
 
 const Vaso: React.FC<VasoProps> = ({
   component: WrapComponent = 'div',
@@ -282,6 +301,11 @@ const Vaso: React.FC<VasoProps> = ({
   const layerRef = useRef<HTMLSpanElement>(null)
   const svgSupported = useSyncExternalStore(subscribeNoop, getSvgBackdropSupport, getServerSupport)
   const [geometry, setGeometry] = useState<Geometry | null>(null)
+  const geometryRef = useRef<Geometry | null>(null)
+  const lastResizeRef = useRef(0)
+  const settleTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
+  // The latest measure, so a pending settle uses the current props instead of the ones it was scheduled with
+  const measureRef = useRef<(settled?: boolean) => void>(() => {})
   // Without backdrop refraction (Safari, Firefox), refract a clone of what's behind the glass instead
   const copyMode = !svgSupported
 
@@ -290,7 +314,7 @@ const Vaso: React.FC<VasoProps> = ({
     const container = containerRef.current
     if (!wrapper || !container) return
 
-    const measure = () => {
+    const measure = (settled = false) => {
       // offsetWidth/Height ignore CSS transforms, matching the filter's local coordinates
       const finalWidth = Math.max(1, (width ?? wrapper.offsetWidth) + 2 * px)
       const finalHeight = Math.max(1, (height ?? wrapper.offsetHeight) + 2 * py)
@@ -300,30 +324,53 @@ const Vaso: React.FC<VasoProps> = ({
 
       const boundingBoxUnits = copyMode && usesBoundingBoxUnits()
 
-      setGeometry((prev) => {
-        if (
-          prev &&
-          prev.width === finalWidth &&
-          prev.height === finalHeight &&
-          prev.radius === finalRadius &&
-          prev.boundingBoxUnits === boundingBoxUnits
-        ) {
-          return prev
-        }
-        const bezel = (Math.min(finalWidth, finalHeight) / 2) * BEZEL_RATIO
-        const shortSide = Math.min(finalWidth, finalHeight)
-        const axisScale = boundingBoxUnits ? { x: shortSide / finalWidth, y: shortSide / finalHeight } : undefined
-        const href = getDisplacementMap(finalWidth, finalHeight, finalRadius, bezel, axisScale)
-        return { width: finalWidth, height: finalHeight, radius: finalRadius, href, boundingBoxUnits }
-      })
+      const prev = geometryRef.current
+      if (
+        prev &&
+        !(settled && prev.stale) &&
+        prev.width === finalWidth &&
+        prev.height === finalHeight &&
+        prev.radius === finalRadius &&
+        prev.boundingBoxUnits === boundingBoxUnits
+      ) {
+        return
+      }
+      const bezel = (Math.min(finalWidth, finalHeight) / 2) * BEZEL_RATIO
+      const shortSide = Math.min(finalWidth, finalHeight)
+      const axisScale = boundingBoxUnits ? { x: shortSide / finalWidth, y: shortSide / finalHeight } : undefined
+
+      // A change right after another one is part of a continuous resize (dragging, animating). Drawing and
+      // encoding a map for every intermediate size is wasted work, so stretch the last one until it settles
+      const now = performance.now()
+      const resizing = !settled && !!prev && now - lastResizeRef.current < RESIZE_SETTLE_MS
+      lastResizeRef.current = now
+      clearTimeout(settleTimerRef.current)
+
+      let href: string
+      let stale = false
+      if (resizing) {
+        const cached = getDisplacementMap(finalWidth, finalHeight, finalRadius, bezel, axisScale, true)
+        href = cached ?? prev.href
+        stale = !cached
+        if (stale) settleTimerRef.current = setTimeout(() => measureRef.current(true), RESIZE_SETTLE_MS)
+      } else {
+        href = getDisplacementMap(finalWidth, finalHeight, finalRadius, bezel, axisScale) ?? ''
+      }
+
+      const next = { width: finalWidth, height: finalHeight, radius: finalRadius, href, boundingBoxUnits, stale }
+      geometryRef.current = next
+      setGeometry(next)
     }
+    measureRef.current = measure
 
     measure()
     if (typeof ResizeObserver === 'undefined') return
-    const observer = new ResizeObserver(measure)
+    const observer = new ResizeObserver(() => measure())
     observer.observe(wrapper)
     return () => observer.disconnect()
   }, [width, height, px, py, radius, copyMode])
+
+  useEffect(() => () => clearTimeout(settleTimerRef.current), [])
 
   const useSvgFilter = svgSupported && !!geometry?.href
   const useCopyFilter = copyMode && !!geometry?.href

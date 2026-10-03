@@ -323,3 +323,158 @@
     animation: none;
   }
 }
+
+.hero-glow {
+  position: absolute;
+  top: -60px;
+  left: -40px;
+  width: 520px;
+  max-width: 100%;
+  height: 300px;
+  background:
+    radial-gradient(closest-side circle at 30% 40%, rgba(227, 167, 90, 0.22), transparent);
+  filter: blur(20px);
+  pointer-events: none;
+}
+
+[data-theme="dark"] .hero-glow {
+  background:
+    radial-gradient(closest-side circle at 30% 40%, rgba(227, 167, 90, 0.12), transparent);
+}
+
+/* Segmented control: the same track as the theme switcher */
+.segmented-track {
+  background-color: #fff;
+  border-color: #fff;
+}
+.segmented-tab {
+  color: #6b7280;
+}
+.segmented-tab:hover {
+  color: #374151;
+}
+.segmented-tab-active {
+  color: #111827;
+}
+/* Same lift as the slider glass, so the pill reads over the white track */
+.segmented-pill [data-vaso] {
+  box-shadow: 0px 1px 8px rgba(55, 53, 45, 0.2) !important;
+}
+[data-theme="dark"] .segmented-pill [data-vaso] {
+  box-shadow: 0px 1px 8px rgba(160, 183, 187, 0.2) !important;
+}
+[data-theme="dark"] .segmented-track {
+  background-color: rgba(17, 24, 39, 0.8);
+  border-color: rgba(55, 65, 81, 0.5);
+}
+[data-theme="dark"] .segmented-tab {
+  color: #d1d5db;
+}
+[data-theme="dark"] .segmented-tab:hover {
+  color: #f3f4f6;
+}
+[data-theme="dark"] .segmented-tab-active {
+  color: #fff;
+}
+
+/* Color picker: hue around the wheel, fading to white at the center */
+.color-wheel {
+  background:
+    radial-gradient(closest-side circle, #fff, rgba(255, 255, 255, 0)),
+    conic-gradient(from 90deg, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
+}
+.color-lens [data-vaso] {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6), 0px 2px 10px rgba(55, 53, 45, 0.35) !important;
+}
+
+/* Code-like text and links under the floating glass: bold black, a step darker than body text */
+.theme-code {
+  color: #111827;
+}
+[data-theme="dark"] .theme-code {
+  color: #fff;
+}
+
+/* Notifications: a photo behind the toast, so the clear glass has something to bend */
+.toast-backdrop {
+  background: url(/flower.jpg) 30% 20% / cover;
+}
+.toast-title,
+.toast-body {
+  color: #fff;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+}
+.toast-body {
+  opacity: 0.9;
+}
+
+/* Buttons */
+.glass-button-primary {
+  color: #fff;
+  background-color: rgba(227, 167, 90, 0.75);
+}
+.glass-button-secondary,
+.glass-button-icon {
+  color: #374151;
+  background-color: rgba(245, 244, 237, 0.4);
+}
+[data-theme="dark"] [data-theme="dark"] .glass-button-secondary,
+[data-theme="dark"] .glass-button-icon {
+  color: #e5e7eb;
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Code block */
+.code-block {
+  background-color: #e2dfd2;
+  color: #374151;
+}
+.code-block-bar {
+  color: #66717c;
+  border-bottom: 1px solid rgba(156, 163, 175, 0.3);
+}
+.code-comment {
+  color: #9ca3af;
+  font-style: italic;
+}
+.code-string,
+.code-number {
+  color: #b07b35;
+}
+.code-keyword {
+  color: #66717c;
+}
+.code-tag {
+  color: #111827;
+  font-weight: 600;
+}
+.code-prop {
+  color: #4b5563;
+}
+[data-theme="dark"] .code-block {
+  background-color: #171f28;
+  color: #e5e7eb;
+}
+[data-theme="dark"] .code-block-bar {
+  color: #9ca3af;
+  border-color: rgba(75, 85, 99, 0.5);
+}
+[data-theme="dark"] .code-string,
+[data-theme="dark"] .code-number {
+  color: #e3a75a;
+}
+[data-theme="dark"] .code-keyword {
+  color: #9ca3af;
+}
+[data-theme="dark"] .code-tag {
+  color: #f3f4f6;
+}
+[data-theme="dark"] .code-prop {
+  color: #cccfc1;
+}
+
+
+/* Buttons over media: light icons in either theme */
+.glass-button-icon.glass-button-on-media {
+  color: #fff;
+}

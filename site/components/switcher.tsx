@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from 'react'
 import { Vaso } from 'vaso'
 import clsx from 'clsx'
-import { useGlassContext } from '../contexts/glass-context'
+import { useGlassContext, useGlassTuning } from '../contexts/glass-context'
 
 export interface SwitcherProps {
   /** Options for the switcher */
@@ -27,6 +27,7 @@ export interface SwitcherProps {
 
 export const Switcher: React.FC<SwitcherProps> = ({ xOption, yOption, value = xOption.id, onChange }) => {
   const { settings } = useGlassContext()
+  const tuning = useGlassTuning()
   const [activeOption, setActiveOption] = useState(value)
   const options = useMemo(() => [xOption, yOption], [xOption, yOption])
 
@@ -72,7 +73,8 @@ export const Switcher: React.FC<SwitcherProps> = ({ xOption, yOption, value = xO
       {/* Glass overlay using Vaso */}
       <Vaso
         radius={50}
-        depth={1.4}
+        depth={1.4 + tuning.depth}
+        blur={Math.max(0, 0.1 + tuning.blur)}
         dispersion={settings.dispersion}
         px={4}
         py={4}
