@@ -58,3 +58,11 @@ jobs:
 
       # Push only after a successful publish, so a failed publish leaves no stray tag
       - run: git push --follow-tags
+
+      # Release notes are generated from the pull requests and commits since the previous tag
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="v$(node -p "require('./package.json').version")"
+          gh release create "$VERSION" --title "$VERSION" --generate-notes --verify-tag
