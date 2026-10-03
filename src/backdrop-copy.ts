@@ -16,6 +16,9 @@ const RECLONE_INTERVAL = 100
 const MAX_MIRROR_PIXEL_RATIO = 2
 // Longest a replacement clone waits for its images and videos before it's shown anyway
 const MAX_READY_WAIT = 1000
+// Visibility is reported a frame late, so glass this close to the viewport keeps updating and is already
+// aligned when it scrolls into view
+const VISIBILITY_MARGIN = '100px'
 
 const FOCUSABLE = 'a[href], area[href], button, input, select, textarea, iframe, summary, [tabindex], [contenteditable]'
 
@@ -336,10 +339,20 @@ function createBackdropCopy(glass: Glass) {
     observer.observe(source, { subtree: true, childList: true, attributes: true, characterData: true })
   }
 
+  // Off-screen glass can't be seen, so it skips re-cloning and aligning until it comes back near the viewport.
+  // Changes in the meantime stay flagged and are applied on its first visible frame
+  let visible = true
+  const visibilityObserver =
+    typeof IntersectionObserver === 'undefined'
+      ? null
+      : new IntersectionObserver(([entry]) => (visible = entry.isIntersecting), { rootMargin: VISIBILITY_MARGIN })
+  visibilityObserver?.observe(glass.container)
+
   const dispose = () => {
     observer?.disconnect()
     observer = null
     ownObserver.disconnect()
+    visibilityObserver?.disconnect()
     active?.root.remove()
     pending?.root.remove()
     own?.remove()
@@ -409,7 +422,7 @@ function createBackdropCopy(glass: Glass) {
   }
 
   const update = (now: number) => {
-    if (!glass.container.isConnected) return
+    if (!glass.container.isConnected || !visible) return
     if ((domChanged || stylesChanged) && now - lastBuild >= RECLONE_INTERVAL) build(now)
     if (ownChanged && now - lastOwnBuild >= RECLONE_INTERVAL) buildOwn(now)
     if (!active) return

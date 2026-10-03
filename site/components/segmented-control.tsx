@@ -20,15 +20,15 @@ export function SegmentedControl() {
   const [active, setActive] = useState(0)
   const [tabs, setTabs] = useState<{ left: number; width: number }[]>([])
   const [pill, setPill] = useState({ x: 0, width: 0 })
-  const tabRefs = useRef<(HTMLButtonElement | null)[]>([])
+  const trackRef = useRef<HTMLDivElement>(null)
 
   // Measure every tab, so the pill can travel between them
   useLayoutEffect(() => {
-    const measure = () =>
-      setTabs(tabRefs.current.map((tab) => ({ left: tab?.offsetLeft ?? 0, width: tab?.offsetWidth ?? 0 })))
+    const tabElements = Array.from(trackRef.current!.querySelectorAll<HTMLElement>('[role="tab"]'))
+    const measure = () => setTabs(tabElements.map((tab) => ({ left: tab.offsetLeft, width: tab.offsetWidth })))
     measure()
     const observer = new ResizeObserver(measure)
-    tabRefs.current.forEach((tab) => tab && observer.observe(tab))
+    tabElements.forEach((tab) => observer.observe(tab))
     return () => observer.disconnect()
   }, [])
 
@@ -55,6 +55,7 @@ export function SegmentedControl() {
 
   return (
     <div
+      ref={trackRef}
       role="tablist"
       aria-label="Library"
       className="relative flex p-1.5 rounded-full border shadow-md segmented-track select-none max-w-full"
@@ -64,9 +65,6 @@ export function SegmentedControl() {
       {TABS.map((tab, i) => (
         <button
           key={tab}
-          ref={(el) => {
-            tabRefs.current[i] = el
-          }}
           role="tab"
           aria-selected={active === i}
           onClick={() => setActive(i)}

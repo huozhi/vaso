@@ -4,19 +4,17 @@ import { useState } from 'react'
 import { useSpring } from '@react-spring/web'
 import clsx from 'clsx'
 import { Vaso } from 'vaso'
-import { useGlassContext } from '../contexts/glass-context'
+import { useGlassContext, useGlassTuning } from '../contexts/glass-context'
 
 type GlassButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: 'primary' | 'secondary' | 'icon'
-  size?: 'sm' | 'md'
   /** 0 = clear, 1 = frosted */
   frost?: number
 }
 
-const RADIUS = { sm: 12, md: 999 }
-
-export function GlassButton({ variant = 'secondary', size = 'md', frost, className, children, ...props }: GlassButtonProps) {
+// A round glass icon button that bulges when pressed
+export function GlassButton({ frost = 0, className, children, ...props }: GlassButtonProps) {
   const { settings } = useGlassContext()
+  const tuning = useGlassTuning()
   const [pressed, setPressed] = useState(false)
   const [press, setPress] = useState(0)
 
@@ -30,9 +28,9 @@ export function GlassButton({ variant = 'secondary', size = 'md', frost, classNa
   return (
     <Vaso
       component="span"
-      radius={RADIUS[size]}
-      depth={0.6 + press * 1.6}
-      blur={frost !== undefined ? 0.3 + frost * 5.7 : variant === 'primary' ? 1 : settings.blur}
+      radius={999}
+      depth={0.6 + press * 1.6 + tuning.depth}
+      blur={Math.max(0, 0.3 + frost * 5.7 + tuning.blur)}
       dispersion={settings.dispersion + press * 0.6}
       specular={0.6 + press * 0.3}
       className="inline-flex"
@@ -48,10 +46,7 @@ export function GlassButton({ variant = 'secondary', size = 'md', frost, classNa
         onPointerLeave={() => setPressed(false)}
         onPointerCancel={() => setPressed(false)}
         className={clsx(
-          'relative inline-flex items-center justify-center gap-2 font-medium cursor-pointer select-none',
-          size === 'sm' ? 'h-7 px-2.5 text-xs rounded-[12px]' : 'h-10 text-sm rounded-full',
-          size === 'md' && (variant === 'icon' ? 'w-10' : 'px-5'),
-          `glass-button-${variant}`,
+          'relative inline-flex items-center justify-center w-10 h-10 rounded-full cursor-pointer select-none glass-button',
           className,
         )}
       >
@@ -60,4 +55,3 @@ export function GlassButton({ variant = 'secondary', size = 'md', frost, classNa
     </Vaso>
   )
 }
-

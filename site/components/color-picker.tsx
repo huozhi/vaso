@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { Vaso } from 'vaso'
 import { useGlassContext, useGlassTuning } from '../contexts/glass-context'
 
@@ -27,15 +27,14 @@ export function ColorPicker() {
   // Polar position of the lens: angle in degrees (clockwise from the right), distance as a fraction of the radius
   const [pick, setPick] = useState({ angle: 33, distance: 0.6 })
   const [isDragging, setIsDragging] = useState(false)
-  const wheelRef = useRef<HTMLDivElement>(null)
 
   const radius = WHEEL_SIZE / 2
   const color = hsvToHex(pick.angle, pick.distance)
   const lensX = radius + Math.cos((pick.angle * Math.PI) / 180) * pick.distance * radius
   const lensY = radius + Math.sin((pick.angle * Math.PI) / 180) * pick.distance * radius
 
-  const pickAt = (clientX: number, clientY: number) => {
-    const rect = wheelRef.current!.getBoundingClientRect()
+  const pickAt = (wheel: Element, clientX: number, clientY: number) => {
+    const rect = wheel.getBoundingClientRect()
     const dx = clientX - rect.left - radius
     const dy = clientY - rect.top - radius
     const angle = ((Math.atan2(dy, dx) * 180) / Math.PI + 360) % 360
@@ -45,17 +44,16 @@ export function ColorPicker() {
   return (
     <div className="flex items-center gap-10 select-none">
       <div
-        ref={wheelRef}
         className="relative rounded-full shadow-md color-wheel"
         style={{ width: WHEEL_SIZE, height: WHEEL_SIZE, touchAction: 'none', cursor: isDragging ? 'grabbing' : 'grab' }}
         onPointerDown={(e) => {
           e.preventDefault()
           e.currentTarget.setPointerCapture(e.pointerId)
           setIsDragging(true)
-          pickAt(e.clientX, e.clientY)
+          pickAt(e.currentTarget, e.clientX, e.clientY)
         }}
         onPointerMove={(e) => {
-          if (e.currentTarget.hasPointerCapture(e.pointerId)) pickAt(e.clientX, e.clientY)
+          if (e.currentTarget.hasPointerCapture(e.pointerId)) pickAt(e.currentTarget, e.clientX, e.clientY)
         }}
         onPointerUp={() => setIsDragging(false)}
         onPointerCancel={() => setIsDragging(false)}

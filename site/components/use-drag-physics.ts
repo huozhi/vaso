@@ -8,8 +8,6 @@ const PRESS_SCALE = 0.5
 // Stretch per px/ms of drag speed, and the most it can stretch
 const STRETCH_PER_SPEED = 0.22
 const MAX_STRETCH = 0.35
-// Once the pointer stops moving for this long, the stretch relaxes
-const IDLE_MS = 70
 
 // Squash and stretch for a dragged glass: it swells while held, stretches along the drag with speed and narrows
 // across it, then wobbles back on release. Underdamped springs give it the liquid overshoot
@@ -17,8 +15,8 @@ export function useDragPhysics() {
   const [pressed, setPressed] = useState(false)
   const [stretchTarget, setStretchTarget] = useState(0)
   const [state, setState] = useState({ press: 0, stretch: 0 })
+  // Last pointer sample, to measure the drag speed
   const lastRef = useRef<{ x: number; time: number } | null>(null)
-  const idleRef = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   useSpring({
     press: pressed ? 1 : 0,
@@ -35,17 +33,15 @@ export function useDragPhysics() {
   const move = (x: number) => {
     const now = performance.now()
     const last = lastRef.current
+    // Each move sets the stretch from its own speed, so slowing down relaxes it; it fully relaxes on release
     if (last) {
       const speed = Math.abs(x - last.x) / Math.max(1, now - last.time)
       setStretchTarget(Math.min(MAX_STRETCH, speed * STRETCH_PER_SPEED))
     }
     lastRef.current = { x, time: now }
-    clearTimeout(idleRef.current)
-    idleRef.current = setTimeout(() => setStretchTarget(0), IDLE_MS)
   }
 
   const end = () => {
-    clearTimeout(idleRef.current)
     lastRef.current = null
     setPressed(false)
     setStretchTarget(0)

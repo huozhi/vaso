@@ -7,8 +7,6 @@ export interface GlassSettings {
   blur: number
   dispersion: number
   radius: number
-  px: number
-  py: number
 }
 
 export const defaultSettings: GlassSettings = {
@@ -16,8 +14,6 @@ export const defaultSettings: GlassSettings = {
   blur: 0.25,
   dispersion: 0.3,
   radius: 12,
-  px: 2,
-  py: 0,
 }
 
 interface GlassStore {

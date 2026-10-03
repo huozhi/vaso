@@ -39,11 +39,16 @@ export function FrostedCard() {
     if (videoRef.current) videoRef.current.playbackRate = FROSTED_VIDEO_SPEED
   }, [])
 
+  // Show the current time, then wake up once at the start of each minute to update it
   useEffect(() => {
-    setTime(formatTime(new Date()))
-    const timer = setInterval(() => setTime(formatTime(new Date())), 10_000)
-    return () => clearInterval(timer)
-  }, [])
+    const now = new Date()
+    if (formatTime(now) !== time) {
+      setTime(formatTime(now))
+      return
+    }
+    const timer = setTimeout(() => setTime(formatTime(new Date())), 60_000 - (now.getTime() % 60_000))
+    return () => clearTimeout(timer)
+  }, [time])
 
   useSpring({
     frost: frostedGlass ? 1 : 0,
@@ -96,48 +101,46 @@ export function FrostedCard() {
           </Vaso>
 
           <div className="flex flex-col items-center gap-4">
-          {/* Icon toolbar */}
-          <Vaso radius={24} {...glass} className="rounded-full">
-            <div className="relative flex items-center gap-1 px-2 h-12 rounded-full" style={tint}>
-              {ICONS.map((icon) => (
-                <button key={icon.label} aria-label={icon.label} className={ICON_BUTTON}>
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d={icon.path} />
+            {/* Icon toolbar */}
+            <Vaso radius={24} {...glass} className="rounded-full">
+              <div className="relative flex items-center gap-1 px-2 h-12 rounded-full" style={tint}>
+                {ICONS.map((icon) => (
+                  <button key={icon.label} aria-label={icon.label} className={ICON_BUTTON}>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d={icon.path} />
+                    </svg>
+                  </button>
+                ))}
+                <button
+                  aria-label="Like"
+                  aria-pressed={liked}
+                  onClick={() => setLiked(!liked)}
+                  className={ICON_BUTTON}
+                >
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill={liked ? '#e3a75a' : 'none'} stroke={liked ? '#e3a75a' : 'currentColor'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20.8 4.6a5.5 5.5 0 00-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 00-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 000-7.8z" />
                   </svg>
                 </button>
-              ))}
-              <button
-                aria-label="Like"
-                aria-pressed={liked}
-                onClick={() => setLiked(!liked)}
-                className={ICON_BUTTON}
-              >
-                <svg width="22" height="22" viewBox="0 0 24 24" fill={liked ? '#e3a75a' : 'none'} stroke={liked ? '#e3a75a' : 'currentColor'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20.8 4.6a5.5 5.5 0 00-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 00-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 000-7.8z" />
-                </svg>
-              </button>
-            </div>
-          </Vaso>
+              </div>
+            </Vaso>
 
-          {/* Icon only, so swapping play and pause never changes its size */}
-          <GlassButton
-            variant="icon"
-            frost={frost}
-            className="glass-button-on-media"
-            style={tint}
-            aria-label={playing ? 'Pause video' : 'Play video'}
-            onClick={() => {
-              const video = videoRef.current
-              if (!video) return
-              if (video.paused) video.play()
-              else video.pause()
-              setPlaying(!video.paused)
-            }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-              {playing ? <path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" /> : <path d="M8 5.5v13a1 1 0 001.5.86l10.5-6.5a1 1 0 000-1.72L9.5 4.64A1 1 0 008 5.5z" />}
-            </svg>
-          </GlassButton>
+            {/* Icon only, so swapping play and pause never changes its size */}
+            <GlassButton
+              frost={frost}
+              style={tint}
+              aria-label={playing ? 'Pause video' : 'Play video'}
+              onClick={() => {
+                const video = videoRef.current
+                if (!video) return
+                if (video.paused) video.play()
+                else video.pause()
+                setPlaying(!video.paused)
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                {playing ? <path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" /> : <path d="M8 5.5v13a1 1 0 001.5.86l10.5-6.5a1 1 0 000-1.72L9.5 4.64A1 1 0 008 5.5z" />}
+              </svg>
+            </GlassButton>
           </div>
         </div>
       </div>

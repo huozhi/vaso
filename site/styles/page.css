@@ -1,33 +1,3 @@
-.custom-range::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  height: 16px;
-  width: 16px;
-  border-radius: 50%;
-  background: #ffffff;
-  border: 2px solid #6b7280;
-  cursor: pointer;
-}
-
-.custom-range::-moz-range-thumb {
-  height: 16px;
-  width: 16px;
-  border-radius: 50%;
-  background: #ffffff;
-  border: 2px solid #6b7280;
-  cursor: pointer;
-  box-sizing: border-box;
-}
-
-.custom-range::-ms-thumb {
-  height: 16px;
-  width: 16px;
-  border-radius: 50%;
-  background: #ffffff;
-  border: 2px solid #6b7280;
-  cursor: pointer;
-}
-
 /* Desktop - remove margin-right */
 @media (min-width: 769px) {
   .mobile-h1-small {
@@ -153,20 +123,6 @@
   transition: color 500ms ease;
 }
 
-.theme-author {
-  color: #374151;
-  transition: color 500ms ease;
-}
-
-.theme-link {
-  color: #374151;
-  transition: color 500ms ease;
-}
-
-.theme-link:hover {
-  color: #111827;
-}
-
 /* Dark Theme */
 [data-theme="dark"] {
   background-color: #111827;
@@ -217,29 +173,12 @@
   color: #9ca3af;
 }
 
-[data-theme="dark"] .theme-author {
-  color: #e5e7eb;
-}
-
-[data-theme="dark"] .theme-link {
-  color: #e5e7eb;
-}
-
-[data-theme="dark"] .theme-link:hover {
-  color: #ffffff;
-}
-
 :root {
   --theme-border-color: rgba(156, 163, 175, 0.3);
 }
 
-[data-theme="dark"] :root {
+[data-theme="dark"] {
   --theme-border-color: rgba(75, 85, 99, 0.5);
-}
-
-/* Divider */
-.theme-divider {
-  background-color: var(--theme-border-color);
 }
 
 .theme-text-bg {
@@ -257,12 +196,6 @@
   color: #cccfc1;
 }
 
-.theme-slider {
-  background-color: #bcbcbc;
-}
-[data-theme="dark"] .theme-slider {
-  background-color: #cccfc1;
-}
 .vaso-slider-thumb {
   background-color: #cdcfc1;
   border-radius: 999px;
@@ -333,7 +266,6 @@
   height: 300px;
   background:
     radial-gradient(closest-side circle at 30% 40%, rgba(227, 167, 90, 0.22), transparent);
-  filter: blur(20px);
   pointer-events: none;
 }
 
@@ -408,20 +340,9 @@
   opacity: 0.9;
 }
 
-/* Buttons */
-.glass-button-primary {
+/* Round icon button over media */
+.glass-button {
   color: #fff;
-  background-color: rgba(227, 167, 90, 0.75);
-}
-.glass-button-secondary,
-.glass-button-icon {
-  color: #374151;
-  background-color: rgba(245, 244, 237, 0.4);
-}
-[data-theme="dark"] [data-theme="dark"] .glass-button-secondary,
-[data-theme="dark"] .glass-button-icon {
-  color: #e5e7eb;
-  background-color: rgba(255, 255, 255, 0.08);
 }
 
 /* Code block */
@@ -473,8 +394,3 @@
   color: #cccfc1;
 }
 
-
-/* Buttons over media: light icons in either theme */
-.glass-button-icon.glass-button-on-media {
-  color: #fff;
-}

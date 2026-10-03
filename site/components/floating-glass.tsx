@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { useSpring } from '@react-spring/web'
 import clsx from 'clsx'
 import { Vaso } from 'vaso'
@@ -15,14 +15,12 @@ const PADDING_X = 10
 const PADDING_Y = 5
 // Smallest scale before the glass is hidden. Not 0, so it shrinks into a point instead of vanishing
 const MIN_SCALE = 0.01
-// How long the glass lingers on a target after the finger lifts
-const TOUCH_LINGER_MS = 450
 
 type Box = { x: number; y: number; width: number; height: number; scale: number }
 
 // One glass shared by every target inside: it jumps from target to target as they're hovered, and shrinks into
-// the border where the pointer leaves. On touch, pressing a target stands in for hovering it, and sliding the
-// finger moves the glass across targets
+// the border where the pointer leaves. On touch, pressing a target stands in for hovering it, sliding the
+// finger moves the glass across targets, and lifting it shrinks the glass away
 export function FloatingGlass({
   component: Component = 'span',
   className,
@@ -33,7 +31,6 @@ export function FloatingGlass({
   children: React.ReactNode
 }) {
   const { settings } = useGlassContext()
-  const rootRef = useRef<HTMLElement>(null)
   const [target, setTarget] = useState<Box>({ x: 0, y: 0, width: 0, height: 0, scale: MIN_SCALE })
   const [glass, setGlass] = useState(target)
   // Appear on the first hovered target instead of gliding in from wherever the glass last left
@@ -47,12 +44,10 @@ export function FloatingGlass({
     onChange: ({ value }) => setGlass(value as Box),
   })
 
-  const lingerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
   const hidden = glass.scale <= MIN_SCALE * 2
 
-  const jumpTo = (element: Element | null) => {
-    const root = rootRef.current
-    if (!element || !root || !root.contains(element)) return
+  const jumpTo = (root: Element, element: Element | null) => {
+    if (!element || !root.contains(element)) return
     // Measured against the root's box, since targets can sit inside inline text
     const rect = element.getBoundingClientRect()
     const rootRect = root.getBoundingClientRect()
@@ -73,31 +68,26 @@ export function FloatingGlass({
 
   return (
     <Component
-      // @ts-expect-error: the ref type follows the rendered element
-      ref={rootRef}
       className={clsx('relative', className)}
       onPointerOver={(e: React.PointerEvent) => {
         // Touch is handled from pointerdown, which also covers a finger landing without moving
         if (e.pointerType !== 'mouse') return
-        jumpTo((e.target as Element).closest(`[${GLASS_TARGET_ATTRIBUTE}]`))
+        jumpTo(e.currentTarget, (e.target as Element).closest(`[${GLASS_TARGET_ATTRIBUTE}]`))
       }}
       onPointerDown={(e: React.PointerEvent) => {
         if (e.pointerType === 'mouse') return
-        clearTimeout(lingerRef.current)
-        jumpTo(targetAt(e.clientX, e.clientY))
+        jumpTo(e.currentTarget, targetAt(e.clientX, e.clientY))
       }}
       onPointerMove={(e: React.PointerEvent) => {
         // Touch pointers stay captured by the element they started on, so find the target under the finger
         if (e.pointerType === 'mouse') return
-        jumpTo(targetAt(e.clientX, e.clientY))
+        jumpTo(e.currentTarget, targetAt(e.clientX, e.clientY))
       }}
       onPointerUp={(e: React.PointerEvent) => {
+        // Lifting the finger ends the touch's "hover": the glass shrinks away where it is
         if (e.pointerType === 'mouse') return
-        clearTimeout(lingerRef.current)
-        lingerRef.current = setTimeout(() => {
-          setSnap(false)
-          shrinkInto(null)
-        }, TOUCH_LINGER_MS)
+        setSnap(false)
+        shrinkInto(null)
       }}
       onPointerCancel={() => {
         // The page started scrolling
@@ -106,7 +96,7 @@ export function FloatingGlass({
       }}
       onPointerLeave={(e: React.PointerEvent) => {
         if (e.pointerType !== 'mouse') return
-        const rect = rootRef.current!.getBoundingClientRect()
+        const rect = e.currentTarget.getBoundingClientRect()
         setSnap(false)
         shrinkInto({
           x: Math.max(0, Math.min(rect.width, e.clientX - rect.left)),

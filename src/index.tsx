@@ -19,6 +19,23 @@ const REFRACTION = 0.35
 // Spread between the least and most refracted wavelengths, as a fraction of the bezel width
 const DISPERSION = 0.5
 
+export type Outset =
+  | number
+  | { x?: number; y?: number; top?: number; right?: number; bottom?: number; left?: number }
+
+// Resolves `outset` (and the deprecated `px`/`py`) into the four sides
+function resolveOutset(outset: Outset | undefined, px = 0, py = 0) {
+  if (typeof outset === 'number') return { top: outset, right: outset, bottom: outset, left: outset }
+  const x = outset?.x ?? px
+  const y = outset?.y ?? py
+  return {
+    top: outset?.top ?? y,
+    right: outset?.right ?? x,
+    bottom: outset?.bottom ?? y,
+    left: outset?.left ?? x,
+  }
+}
+
 export type VasoProps<Element extends HTMLElement = HTMLDivElement> = React.HTMLAttributes<Element> & {
   /** The HTML element or React component to render as the glass container
    * @default 'div'
@@ -38,16 +55,17 @@ export type VasoProps<Element extends HTMLElement = HTMLDivElement> = React.HTML
    */
   height?: number
 
-  /** Horizontal padding around the glass effect in pixels
+  /** How far the glass extends beyond the element, in pixels, without affecting layout. A number applies to
+   * every side; an object sets the axes (`x`, `y`) or single sides (`top`, `right`, `bottom`, `left`), with
+   * sides taking precedence over axes
    * @default 0
-   * @range 0-100
    */
+  outset?: Outset
+
+  /** @deprecated Use `outset={{ x }}`. Extends the glass horizontally beyond the element */
   px?: number
 
-  /** Vertical padding around the glass effect in pixels
-   * @default 0
-   * @range 0-100
-   */
+  /** @deprecated Use `outset={{ y }}`. Extends the glass vertically beyond the element */
   py?: number
 
   /** Border radius of the glass container in pixels
@@ -245,6 +263,9 @@ const MAX_SPECTRUM_SAMPLES = 9
 const MAX_COPY_SPECTRUM_SAMPLES = 3
 // Maximum pixels between two neighboring samples before the bands show as separate ghosts
 const SPECTRUM_STEP = 1.25
+// Glass whose shorter side is below this many pixels renders at most SMALL_GLASS_SPECTRUM_SAMPLES bands
+const SMALL_GLASS_SIZE = 80
+const SMALL_GLASS_SPECTRUM_SAMPLES = 5
 const spectrumCache = new Map<number, string[]>()
 
 function getSpectrum(samples: number) {
@@ -285,8 +306,9 @@ const Vaso: React.FC<VasoProps> = ({
   children,
   width,
   height,
-  px = 0,
-  py = 0,
+  outset,
+  px,
+  py,
   radius,
   depth = 0,
   blur = 0.1,
@@ -295,17 +317,19 @@ const Vaso: React.FC<VasoProps> = ({
   style,
   ...htmlProps
 }) => {
+  const { top, right, bottom, left } = resolveOutset(outset, px, py)
   const filterId = `vaso-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`
   const wrapperRef = useRef<HTMLElement>(null)
   const containerRef = useRef<HTMLElement>(null)
   const layerRef = useRef<HTMLSpanElement>(null)
   const svgSupported = useSyncExternalStore(subscribeNoop, getSvgBackdropSupport, getServerSupport)
   const [geometry, setGeometry] = useState<Geometry | null>(null)
-  const geometryRef = useRef<Geometry | null>(null)
-  const lastResizeRef = useRef(0)
-  const settleTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
-  // The latest measure, so a pending settle uses the current props instead of the ones it was scheduled with
-  const measureRef = useRef<(settled?: boolean) => void>(() => {})
+  // Survives effect re-runs (props change on every frame of an animated size): the last geometry, when it last
+  // changed, and the pending redraw for when the size settles
+  const resizeRef = useRef<{ geometry: Geometry | null; lastChange: number; settleTimer?: ReturnType<typeof setTimeout> }>({
+    geometry: null,
+    lastChange: 0,
+  })
   // Without backdrop refraction (Safari, Firefox), refract a clone of what's behind the glass instead
   const copyMode = !svgSupported
 
@@ -314,17 +338,23 @@ const Vaso: React.FC<VasoProps> = ({
     const container = containerRef.current
     if (!wrapper || !container) return
 
+    const resize = resizeRef.current
+    const settleLater = () => {
+      clearTimeout(resize.settleTimer)
+      resize.settleTimer = setTimeout(() => measure(true), RESIZE_SETTLE_MS)
+    }
+
     const measure = (settled = false) => {
       // offsetWidth/Height ignore CSS transforms, matching the filter's local coordinates
-      const finalWidth = Math.max(1, (width ?? wrapper.offsetWidth) + 2 * px)
-      const finalHeight = Math.max(1, (height ?? wrapper.offsetHeight) + 2 * py)
+      const finalWidth = Math.max(1, (width ?? wrapper.offsetWidth) + left + right)
+      const finalHeight = Math.max(1, (height ?? wrapper.offsetHeight) + top + bottom)
       // The container either has the explicit radius or inherits the element's CSS radius
       const cssRadius = parseFloat(getComputedStyle(container).borderTopLeftRadius) || 0
       const finalRadius = Math.min(cssRadius, finalWidth / 2, finalHeight / 2)
 
       const boundingBoxUnits = copyMode && usesBoundingBoxUnits()
 
-      const prev = geometryRef.current
+      const prev = resize.geometry
       if (
         prev &&
         !(settled && prev.stale) &&
@@ -342,9 +372,9 @@ const Vaso: React.FC<VasoProps> = ({
       // A change right after another one is part of a continuous resize (dragging, animating). Drawing and
       // encoding a map for every intermediate size is wasted work, so stretch the last one until it settles
       const now = performance.now()
-      const resizing = !settled && !!prev && now - lastResizeRef.current < RESIZE_SETTLE_MS
-      lastResizeRef.current = now
-      clearTimeout(settleTimerRef.current)
+      const resizing = !settled && !!prev && now - resize.lastChange < RESIZE_SETTLE_MS
+      resize.lastChange = now
+      clearTimeout(resize.settleTimer)
 
       let href: string
       let stale = false
@@ -352,25 +382,28 @@ const Vaso: React.FC<VasoProps> = ({
         const cached = getDisplacementMap(finalWidth, finalHeight, finalRadius, bezel, axisScale, true)
         href = cached ?? prev.href
         stale = !cached
-        if (stale) settleTimerRef.current = setTimeout(() => measureRef.current(true), RESIZE_SETTLE_MS)
+        if (stale) settleLater()
       } else {
         href = getDisplacementMap(finalWidth, finalHeight, finalRadius, bezel, axisScale) ?? ''
       }
 
       const next = { width: finalWidth, height: finalHeight, radius: finalRadius, href, boundingBoxUnits, stale }
-      geometryRef.current = next
+      resize.geometry = next
       setGeometry(next)
     }
-    measureRef.current = measure
 
     measure()
+    // A size change re-runs this effect and cancels the pending redraw, so schedule it again for this run
+    if (resize.geometry?.stale) settleLater()
     if (typeof ResizeObserver === 'undefined') return
     const observer = new ResizeObserver(() => measure())
     observer.observe(wrapper)
-    return () => observer.disconnect()
-  }, [width, height, px, py, radius, copyMode])
-
-  useEffect(() => () => clearTimeout(settleTimerRef.current), [])
+    return () => {
+      observer.disconnect()
+      clearTimeout(resize.settleTimer)
+    }
+    // Sides as separate numbers, so a new outset object with the same values doesn't re-measure
+  }, [width, height, top, right, bottom, left, radius, copyMode])
 
   const useSvgFilter = svgSupported && !!geometry?.href
   const useCopyFilter = copyMode && !!geometry?.href
@@ -395,7 +428,9 @@ const Vaso: React.FC<VasoProps> = ({
   // Flat glass doesn't refract, so fade dispersion out as depth approaches zero
   const spreadPx = dispersion ? Math.max(dispersion, 0) * bezel * DISPERSION * Math.min(1, Math.abs(depth) * 4) : 0
   const spread = spreadPx * unit
-  const maxSamples = copyMode ? MAX_COPY_SPECTRUM_SAMPLES : MAX_SPECTRUM_SAMPLES
+  // Small glass has a narrow rim, where extra bands are indistinguishable; each band is a full displacement pass
+  const sizeSamples = geometry && Math.min(geometry.width, geometry.height) < SMALL_GLASS_SIZE ? SMALL_GLASS_SPECTRUM_SAMPLES : Infinity
+  const maxSamples = Math.min(copyMode ? MAX_COPY_SPECTRUM_SAMPLES : MAX_SPECTRUM_SAMPLES, sizeSamples)
   const spectrum =
     spreadPx > 0.5 ? getSpectrum(Math.min(maxSamples, Math.max(3, Math.ceil(spreadPx / SPECTRUM_STEP) + 1))) : null
 
@@ -419,10 +454,10 @@ const Vaso: React.FC<VasoProps> = ({
         ref={containerRef}
         style={{
           position: 'absolute',
-          top: -py,
-          left: -px,
-          width: geometry ? geometry.width : `calc(100% + ${px * 2}px)`,
-          height: geometry ? geometry.height : `calc(100% + ${py * 2}px)`,
+          top: -top,
+          left: -left,
+          width: geometry ? geometry.width : `calc(100% + ${left + right}px)`,
+          height: geometry ? geometry.height : `calc(100% + ${top + bottom}px)`,
           overflow: 'hidden',
           backdropFilter,
           WebkitBackdropFilter: backdropFilter,

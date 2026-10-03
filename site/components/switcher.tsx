@@ -25,7 +25,7 @@ export interface SwitcherProps {
   className?: string
 }
 
-export const Switcher: React.FC<SwitcherProps> = ({ xOption, yOption, value = xOption.id, onChange }) => {
+export const Switcher: React.FC<SwitcherProps> = ({ xOption, yOption, value = xOption.id, onChange, className }) => {
   const { settings } = useGlassContext()
   const tuning = useGlassTuning()
   const [activeOption, setActiveOption] = useState(value)
@@ -45,7 +45,8 @@ export const Switcher: React.FC<SwitcherProps> = ({ xOption, yOption, value = xO
       className={clsx(
         'relative flex backdrop-blur-md rounded-full p-1.5 min-w-[120px] h-[40px] transition-all duration-300',
         'border-2 shadow-md',
-        isDarkTheme ? 'bg-gray-900/80 border border-gray-700/50' : 'bg-white/100 border border-white/100'
+        isDarkTheme ? 'bg-gray-900/80 border border-gray-700/50' : 'bg-white/100 border border-white/100',
+        className
       )}
     >
       {options.map((option) => (
@@ -76,8 +77,7 @@ export const Switcher: React.FC<SwitcherProps> = ({ xOption, yOption, value = xO
         depth={1.4 + tuning.depth}
         blur={Math.max(0, 0.1 + tuning.blur)}
         dispersion={settings.dispersion}
-        px={4}
-        py={4}
+        outset={4}
         className={clsx('vaso-switching', isLeft ? 'vaso-left' : 'vaso-right')}
       >
         <div className="flex items-center justify-center w-full h-full">

@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { FloatingGlass, glassTarget } from './floating-glass'
 
 // Just enough highlighting for short JSX snippets: comments, strings, keywords, tags, props and numbers
@@ -27,13 +27,17 @@ function highlight(code: string) {
 
 export function CodeBlock({ code, filename }: { code: string; filename?: string }) {
   const [copied, setCopied] = useState(false)
-  const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
+
+  // Show "Copied" for a moment after each copy
+  useEffect(() => {
+    if (!copied) return
+    const timer = setTimeout(() => setCopied(false), 1500)
+    return () => clearTimeout(timer)
+  }, [copied])
 
   const copy = async () => {
     await navigator.clipboard.writeText(code)
     setCopied(true)
-    clearTimeout(timer.current)
-    timer.current = setTimeout(() => setCopied(false), 1500)
   }
 
   return (
