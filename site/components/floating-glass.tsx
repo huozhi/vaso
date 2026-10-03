@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSpring } from '@react-spring/web'
 import clsx from 'clsx'
 import { Vaso } from 'vaso'
@@ -15,12 +15,14 @@ const PADDING_X = 10
 const PADDING_Y = 5
 // Smallest scale before the glass is hidden. Not 0, so it shrinks into a point instead of vanishing
 const MIN_SCALE = 0.01
+// How long the glass stays on a target after the finger lifts, so a quick tap is still seen
+const TOUCH_LINGER_MS = 900
 
 type Box = { x: number; y: number; width: number; height: number; scale: number }
 
 // One glass shared by every target inside: it jumps from target to target as they're hovered, and shrinks into
 // the border where the pointer leaves. On touch, pressing a target stands in for hovering it, sliding the
-// finger moves the glass across targets, and lifting it shrinks the glass away
+// finger moves the glass across targets, and lifting it leaves the glass a moment before it shrinks away
 export function FloatingGlass({
   component: Component = 'span',
   className,
@@ -45,6 +47,18 @@ export function FloatingGlass({
   })
 
   const hidden = glass.scale <= MIN_SCALE * 2
+  // The finger lifted: keep the glass on its target for a moment, then shrink it away
+  const [lifted, setLifted] = useState(false)
+
+  useEffect(() => {
+    if (!lifted) return
+    const timer = setTimeout(() => {
+      setLifted(false)
+      setSnap(false)
+      shrinkInto(null)
+    }, TOUCH_LINGER_MS)
+    return () => clearTimeout(timer)
+  }, [lifted])
 
   const jumpTo = (root: Element, element: Element | null) => {
     if (!element || !root.contains(element)) return
@@ -68,7 +82,7 @@ export function FloatingGlass({
 
   return (
     <Component
-      className={clsx('relative', className)}
+      className={clsx('relative floating-glass', className)}
       onPointerOver={(e: React.PointerEvent) => {
         // Touch is handled from pointerdown, which also covers a finger landing without moving
         if (e.pointerType !== 'mouse') return
@@ -76,6 +90,8 @@ export function FloatingGlass({
       }}
       onPointerDown={(e: React.PointerEvent) => {
         if (e.pointerType === 'mouse') return
+        // A new touch takes over from a lingering glass
+        setLifted(false)
         jumpTo(e.currentTarget, targetAt(e.clientX, e.clientY))
       }}
       onPointerMove={(e: React.PointerEvent) => {
@@ -84,13 +100,12 @@ export function FloatingGlass({
         jumpTo(e.currentTarget, targetAt(e.clientX, e.clientY))
       }}
       onPointerUp={(e: React.PointerEvent) => {
-        // Lifting the finger ends the touch's "hover": the glass shrinks away where it is
-        if (e.pointerType === 'mouse') return
-        setSnap(false)
-        shrinkInto(null)
+        // Lifting the finger ends the touch's "hover": the glass lingers, then shrinks away where it is
+        if (e.pointerType !== 'mouse') setLifted(true)
       }}
       onPointerCancel={() => {
         // The page started scrolling
+        setLifted(false)
         setSnap(false)
         shrinkInto(null)
       }}

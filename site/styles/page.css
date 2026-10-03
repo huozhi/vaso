@@ -327,6 +327,16 @@
   color: #fff;
 }
 
+/* On touch screens, pressing a floating glass target is its "hover", so it shouldn't start a text selection or
+   the long-press callout. Mice keep normal selection, e.g. to copy the install command */
+@media (pointer: coarse) {
+  .floating-glass {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+}
+
 /* Notifications: a photo behind the toast, so the clear glass has something to bend */
 .toast-backdrop {
   background: url(/flower.jpg) 30% 20% / cover;
