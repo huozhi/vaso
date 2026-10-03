@@ -74,7 +74,6 @@ function Home() {
         data-theme={theme}
         style={{ fontFamily: "'JetBrains Mono', monospace" }}
       >
-
         <div className="max-w-3xl mx-auto">
           <header className="relative mb-8 flex items-center justify-between mobile-header">
             {/* Soft color glow behind the hero */}
@@ -162,12 +161,7 @@ function Home() {
                 component in your React application and wrap it around any content you want to apply the glass effect
                 to.
               </p>
-
-              <div className="mb-6">
-                <CodeBlock filename="toolbar.tsx" code={USAGE_CODE} />
-              </div>
-
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 theme-text">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 theme-text mb-3">
                 <span>Tune it with</span>
                 <FloatingGlass className="inline-flex flex-wrap items-center gap-x-5 gap-y-3 py-3">
                   {['depth', 'blur', 'dispersion', 'radius', 'specular'].map((prop) => (
@@ -176,6 +170,10 @@ function Home() {
                     </code>
                   ))}
                 </FloatingGlass>
+              </div>
+              
+              <div className="mb-3">
+                <CodeBlock filename="toolbar.tsx" code={USAGE_CODE} />
               </div>
             </section>
 

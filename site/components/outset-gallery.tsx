@@ -24,8 +24,9 @@ export function OutsetGallery() {
   const tuning = useGlassTuning()
 
   return (
-    // Each exhibit is as wide as its pane, with labels wrapping under it, so the gaps between panes stay even
-    <div className="flex flex-wrap justify-center items-start gap-x-12 gap-y-8 select-none">
+    // Each exhibit is as wide as its pane, with labels wrapping under it. One row on every screen: phones get
+    // tighter gaps and narrower labels so all four still fit
+    <div className="flex justify-center items-start gap-x-4 sm:gap-x-12 px-2 sm:px-0 select-none">
       {EXHIBITS.map((exhibit) => (
         <figure key={exhibit.code} className="flex flex-col items-center gap-3">
           {/* Panes share a bottom edge, so the growth reads as steps */}
@@ -48,7 +49,7 @@ export function OutsetGallery() {
               />
             </span>
           </div>
-          <figcaption className="max-w-[7rem] text-[11px] leading-snug text-center theme-label">
+          <figcaption className="max-w-[5rem] sm:max-w-[7rem] text-[10px] sm:text-[11px] leading-snug text-center theme-label">
             <code>{exhibit.code}</code>
           </figcaption>
         </figure>
