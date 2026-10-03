@@ -15,6 +15,10 @@
     "start:site": "devjar start site/dist",
     "prepublishOnly": "pnpm build"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/huozhi/vaso.git"
+  },
   "author": "huozhi",
   "license": "MIT",
   "packageManager": "pnpm@9.15.9",

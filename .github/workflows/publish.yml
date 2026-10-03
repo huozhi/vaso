@@ -1,0 +1,60 @@
+name: Publish
+
+# Run from the Actions tab: pick how to bump the version, and this tags the release and publishes it to npm.
+# Publishing authenticates with npm trusted publishing (OIDC), so no npm token is stored in the repo
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: Version bump
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: patch
+
+permissions:
+  # Push the version commit and tag
+  contents: write
+  # Exchange the workflow's OIDC token for a short-lived npm publish credential
+  id-token: write
+
+# Never publish two releases at once
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    # Only release from main
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # Reads the pnpm version from package.json's packageManager field
+      - uses: pnpm/action-setup@v4
+
+      # Trusted publishing needs npm 11.5.1 or newer, which ships with Node 24
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Bump version
+        env:
+          RELEASE: ${{ inputs.release }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          npm version "$RELEASE" -m "v%s"
+
+      # prepublishOnly builds the package first. Trusted publishing attaches provenance automatically
+      - run: npm publish --access public
+
+      # Push only after a successful publish, so a failed publish leaves no stray tag
+      - run: git push --follow-tags
