@@ -75,6 +75,12 @@ export function FloatingGlass({
     })
   }
   const targetAt = (x: number, y: number) => document.elementFromPoint(x, y)?.closest(`[${GLASS_TARGET_ATTRIBUTE}]`) ?? null
+  const touchTargetAt = (x: number, y: number) => {
+    const element = targetAt(x, y)
+    // Keep a link's first tap native. Revealing hover content during a touch can make iOS
+    // consume the tap to show that content instead of following the link.
+    return element?.closest('a[href]') ? null : element
+  }
 
   // Shrink into a point: the border where the pointer left, or the target itself after a touch
   const shrinkInto = (point: { x: number; y: number } | null) =>
@@ -90,14 +96,16 @@ export function FloatingGlass({
       }}
       onPointerDown={(e: React.PointerEvent) => {
         if (e.pointerType === 'mouse') return
+        const element = touchTargetAt(e.clientX, e.clientY)
+        if (!element) return
         // A new touch takes over from a lingering glass
         setLifted(false)
-        jumpTo(e.currentTarget, targetAt(e.clientX, e.clientY))
+        jumpTo(e.currentTarget, element)
       }}
       onPointerMove={(e: React.PointerEvent) => {
         // Touch pointers stay captured by the element they started on, so find the target under the finger
         if (e.pointerType === 'mouse') return
-        jumpTo(e.currentTarget, targetAt(e.clientX, e.clientY))
+        jumpTo(e.currentTarget, touchTargetAt(e.clientX, e.clientY))
       }}
       onPointerUp={(e: React.PointerEvent) => {
         // Lifting the finger ends the touch's "hover": the glass lingers, then shrinks away where it is

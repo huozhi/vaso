@@ -21,7 +21,7 @@
   },
   "author": "huozhi",
   "license": "MIT",
-  "packageManager": "pnpm@9.15.9",
+  "packageManager": "pnpm@12.9.1",
   "devDependencies": {
     "@react-spring/web": "^10.0.1",
     "@types/node": "24.0.7",
