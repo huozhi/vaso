@@ -1,5 +1,6 @@
 'use client'
 
+import { Analytics } from '@vercel/analytics/react'
 import { GlassProvider, GlassScope } from '../contexts/glass-context'
 import { VasoTitle } from '../components/vaso-title'
 import { ResizableGlass } from '../components/resizable-glass'
@@ -171,7 +172,7 @@ function Home() {
                   ))}
                 </FloatingGlass>
               </div>
-              
+
               <div className="mb-3">
                 <CodeBlock filename="toolbar.tsx" code={USAGE_CODE} />
               </div>
@@ -189,8 +190,11 @@ function Home() {
 
 export default function Page() {
   return (
-    <GlassProvider>
-      <Home />
-    </GlassProvider>
+    <>
+      <GlassProvider>
+        <Home />
+      </GlassProvider>
+      <Analytics mode={process.env.NODE_ENV || 'development'} />
+    </>
   )
 }
