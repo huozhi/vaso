@@ -229,13 +229,23 @@ function applySourceStyles(root: HTMLElement, source: HTMLElement) {
 }
 
 function findBackdrop(glass: Glass) {
-  // Walk up to the nearest ancestor with something visible behind the glass
+  // A transparent ancestor may contain only another glass's icons. Stopping there
+  // loses an image or video immediately behind that ancestor and fills the copy
+  // with the page color instead. Prefer the nearest ancestor with its own painted
+  // background or media; retain the first usable copy for text-only backdrops.
+  let nearest: ReturnType<typeof cloneBackdrop> = null
   for (let node = glass.wrapper.parentElement; node && node !== document.documentElement; node = node.parentElement) {
     const copy = cloneBackdrop(node, glass)
-    if (copy) return copy
-    if (node.querySelectorAll('*').length > MAX_SOURCE_ELEMENTS) return null
+    if (copy) {
+      nearest ??= copy
+      const style = getComputedStyle(node)
+      const painted = !isTransparent(style.backgroundColor) || style.backgroundImage !== 'none'
+      const media = [...node.children].some((child) => /^(IMG|VIDEO|CANVAS|PICTURE)$/i.test(child.tagName))
+      if (painted || media) return copy
+    }
+    if (node.querySelectorAll('*').length > MAX_SOURCE_ELEMENTS) return nearest
   }
-  return null
+  return nearest
 }
 
 // Where a video's frame lands in its box, following object-fit and object-position

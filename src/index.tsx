@@ -483,6 +483,9 @@ const Vaso: React.FC<VasoProps> = ({
               height: geometry.height,
               // Clip the copy so the element's bounding box, used by objectBoundingBox filters, is the glass
               overflow: 'hidden',
+              borderRadius: 'inherit',
+              // Safari can paint filtered pixels outside clip-path and rounded overflow.
+              WebkitMaskImage: '-webkit-radial-gradient(white, black)',
               filter: refractionFilter,
             }}
           />
