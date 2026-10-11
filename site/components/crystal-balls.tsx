@@ -36,6 +36,42 @@ export function CrystalBalls() {
     let previous = 0
     let tilt = 0
     let drag: { index: number; pointerId: number; offsetX: number; offsetY: number; time: number } | null = null
+    let audioContext: AudioContext | null = null
+    let lastSound = 0
+    const soundTimes = new Map<string, number>()
+
+    const unlockAudio = () => {
+      if (!window.AudioContext) return
+      audioContext ??= new AudioContext()
+      if (audioContext.state === 'suspended') void audioContext.resume()
+    }
+    const playCollision = (speed: number, key: string, tone: number) => {
+      if (!audioContext || audioContext.state !== 'running' || speed < 140) return
+      const stamp = performance.now()
+      if (stamp - lastSound < 28 || stamp - (soundTimes.get(key) ?? -Infinity) < 90) return
+      lastSound = stamp
+      soundTimes.set(key, stamp)
+      const now = audioContext.currentTime
+      const volume = clamp(speed / 1200, 0.14, 1) * 0.055
+      const frequency = 720 + (tone % 6) * 85
+      ;[
+        { ratio: 1, volume: 1, decay: 0.3 },
+        { ratio: 2.32, volume: 0.32, decay: 0.19 },
+        { ratio: 3.41, volume: 0.13, decay: 0.12 },
+      ].forEach((part) => {
+        const oscillator = audioContext!.createOscillator()
+        const gain = audioContext!.createGain()
+        oscillator.type = 'sine'
+        oscillator.frequency.setValueAtTime(frequency * part.ratio, now)
+        gain.gain.setValueAtTime(0.0001, now)
+        gain.gain.exponentialRampToValueAtTime(volume * part.volume, now + 0.004)
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + part.decay)
+        oscillator.connect(gain)
+        gain.connect(audioContext!.destination)
+        oscillator.start(now)
+        oscillator.stop(now + part.decay + 0.02)
+      })
+    }
 
     const bounds = () => ({ width: stage.clientWidth, height: stage.clientHeight - FLOOR_HEIGHT })
     const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value))
@@ -60,20 +96,23 @@ export function CrystalBalls() {
       })
     }
 
-    const collide = (width: number, height: number) => {
+    const collide = (width: number, height: number, sound = true) => {
       for (let pass = 0; pass < 3; pass++) {
         bodies.forEach((body, index) => {
           if (drag?.index === index) return
           const r = body.radius
           if (body.x < r || body.x > width - r) {
+            if (sound) playCollision(Math.abs(body.vx), `${index}-side`, index)
             body.x = clamp(body.x, r, width - r)
             body.vx = Math.abs(body.vx) < 40 ? 0 : body.vx * -0.72
           }
           if (body.y > height - r) {
+            if (sound) playCollision(Math.abs(body.vy), `${index}-top`, index)
             body.y = height - r
             body.vy = Math.min(0, body.vy) * -0.62
           }
           if (body.y < r) {
+            if (sound) playCollision(Math.abs(body.vy), `${index}-floor`, index)
             body.y = r
             body.vy = Math.abs(body.vy) < 70 ? 0 : Math.abs(body.vy) * 0.57
             body.vx *= 0.96
@@ -100,6 +139,7 @@ export function CrystalBalls() {
             b.y += ny * overlap * bShare
             const relative = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny
             if (relative >= 0) continue
+            if (sound) playCollision(-relative, `${i}-${j}`, i + j)
             const impulse = -(1 + 0.78) * relative / (aShare + bShare)
             a.vx -= impulse * nx * aShare
             a.vy -= impulse * ny * aShare
@@ -274,14 +314,19 @@ export function CrystalBalls() {
     })
     const resize = new ResizeObserver(() => {
       const { width, height } = bounds()
-      collide(width, height)
+      collide(width, height, false)
       paint()
     })
+    stage.addEventListener('pointerdown', unlockAudio)
+    stage.addEventListener('keydown', unlockAudio)
     resize.observe(stage)
     reset()
     return () => {
       cancelAnimationFrame(frame)
       resize.disconnect()
+      stage.removeEventListener('pointerdown', unlockAudio)
+      stage.removeEventListener('keydown', unlockAudio)
+      if (audioContext) void audioContext.close()
       pointers.forEach((cleanup) => cleanup())
       corners.forEach((cleanup) => cleanup())
     }
