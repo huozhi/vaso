@@ -11,6 +11,7 @@ import { OutsetGallery } from '../components/outset-gallery'
 import { FrostedCard } from '../components/frosted-card'
 import { SegmentedControl } from '../components/segmented-control'
 import { ColorPicker } from '../components/color-picker'
+import { CrystalBalls } from '../components/crystal-balls'
 import { ToastStack } from '../components/toast-stack'
 import { FloatingGlass, glassTarget } from '../components/floating-glass'
 import { CodeBlock } from '../components/code-block'
@@ -125,6 +126,11 @@ function Home() {
                 <DemoCard title="Color picker" caption="drag the lens around the wheel" wide>
                   <GlassScope id="color" label="Color picker">
                     <ColorPicker />
+                  </GlassScope>
+                </DemoCard>
+                <DemoCard title="Crystal balls" wide>
+                  <GlassScope id="crystal" label="Crystal balls">
+                    <CrystalBalls />
                   </GlassScope>
                 </DemoCard>
                 <DemoCard title="Outset" caption="how far the glass reaches past the letter" wide>

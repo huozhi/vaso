@@ -200,6 +200,129 @@
   background-color: #cdcfc1;
   border-radius: 999px;
 }
+
+.crystal-demo {
+  max-width: 690px;
+  padding-bottom: 48px;
+}
+
+.crystal-stage-wrap {
+  display: grid;
+  place-items: center;
+  overflow: visible;
+}
+
+.crystal-stage {
+  position: relative;
+  width: 100%;
+  height: 324px;
+  overflow: visible;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #dbe6e5 0%, #e8e9df 72%, #dadbd1 100%);
+  border: 1px solid rgba(96, 111, 111, 0.12);
+  transform-origin: center;
+}
+
+[data-theme="dark"] .crystal-stage {
+  background: linear-gradient(180deg, #263743 0%, #35454b 72%, #273139 100%);
+}
+
+.crystal-corner {
+  position: absolute;
+  top: 8px;
+  z-index: 4;
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(70, 91, 97, 0.35);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.55);
+  cursor: grab;
+  touch-action: none;
+}
+
+.crystal-corner:active {
+  cursor: grabbing;
+}
+
+.crystal-corner::after {
+  content: '';
+  display: block;
+  width: 10px;
+  height: 10px;
+  margin: auto;
+  border: 2px solid rgba(50, 70, 77, 0.55);
+  border-radius: 50%;
+}
+
+.crystal-corner-left {
+  left: 8px;
+}
+
+.crystal-corner-right {
+  right: 8px;
+}
+
+@media (max-width: 600px) {
+  .crystal-demo {
+    padding-bottom: 32px;
+  }
+
+  .crystal-stage-wrap {
+    height: 500px;
+  }
+}
+
+.crystal-ball {
+  position: absolute;
+  bottom: 36px;
+  left: 0;
+  z-index: 2;
+  visibility: hidden;
+  overflow: visible;
+  border-radius: 50%;
+  cursor: grab;
+  touch-action: none;
+  will-change: transform;
+}
+
+.crystal-ball:active {
+  cursor: grabbing;
+}
+
+.crystal-ball img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  user-select: none;
+}
+
+.crystal-floor {
+  border-top: 1px solid rgba(255, 255, 255, 0.65);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.crystal-launch {
+  position: absolute;
+  bottom: -39px;
+  left: 50%;
+  z-index: 6;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 30px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(90, 110, 116, 0.3);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+}
+
+.crystal-launch:hover {
+  background: rgba(127, 145, 145, 0.12);
+}
 [data-theme="dark"] .vaso-slider-thumb {
   background-color: #e5e5e579;
 }
