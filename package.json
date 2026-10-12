@@ -11,6 +11,7 @@
   "scripts": {
     "dev": "pnpm build && (bunchee --watch --no-clean & devjar dev site)",
     "build": "rm -rf dist && bunchee",
+    "dev:site": "pnpm devjar site",
     "build:site": "pnpm build && devjar build site --origin https://vaso-react.vercel.app",
     "start:site": "devjar start site/dist",
     "prepublishOnly": "pnpm build"
