@@ -32,6 +32,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          # Release notes need the previous tag and its commit history.
+          fetch-depth: 0
 
       # Reads the pnpm version from package.json's packageManager field
       - uses: pnpm/action-setup@v4
@@ -59,10 +62,11 @@ jobs:
       # Push only after a successful publish, so a failed publish leaves no stray tag
       - run: git push --follow-tags
 
-      # Release notes are generated from the pull requests and commits since the previous tag
+      # Include only feat/fix conventional commits since the previous release.
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="v$(node -p "require('./package.json').version")"
-          gh release create "$VERSION" --title "$VERSION" --generate-notes --verify-tag
+          node scripts/release-notes.mjs "$VERSION" > "$RUNNER_TEMP/release-notes.md"
+          gh release create "$VERSION" --title "$VERSION" --notes-file "$RUNNER_TEMP/release-notes.md" --verify-tag
