@@ -309,6 +309,28 @@ function syncMedia(media: MediaPair[]) {
   }
 }
 
+function visualScale(element: HTMLElement, rect: DOMRect) {
+  const boxScale = Math.sqrt((rect.width / (element.offsetWidth || 1)) * (rect.height / (element.offsetHeight || 1))) || 1
+  if (typeof DOMMatrixReadOnly === 'undefined') return boxScale
+  let scale = 1
+  let transformed = false
+  for (let node: HTMLElement | null = element; node; node = node.parentElement) {
+    const transform = getComputedStyle(node).transform
+    if (transform === 'none') continue
+    const matrix = new DOMMatrixReadOnly(transform)
+    const planar =
+      Math.abs(matrix.m13) < 1e-6 && Math.abs(matrix.m14) < 1e-6 &&
+      Math.abs(matrix.m23) < 1e-6 && Math.abs(matrix.m24) < 1e-6 &&
+      Math.abs(matrix.m31) < 1e-6 && Math.abs(matrix.m32) < 1e-6 &&
+      Math.abs(matrix.m34) < 1e-6 && Math.abs(matrix.m43) < 1e-6 &&
+      Math.abs(matrix.m33 - 1) < 1e-6 && Math.abs(matrix.m44 - 1) < 1e-6
+    if (!planar) return boxScale
+    scale *= Math.sqrt(Math.abs(matrix.a * matrix.d - matrix.b * matrix.c))
+    transformed = true
+  }
+  return transformed && scale > 0 ? scale : boxScale
+}
+
 type Clone = NonNullable<ReturnType<typeof cloneBackdrop>> & { applied?: string }
 
 function createBackdropCopy(glass: Glass) {
@@ -452,10 +474,7 @@ function createBackdropCopy(glass: Glass) {
     const containerRect = glass.container.getBoundingClientRect()
     const width = glass.container.offsetWidth
     const height = glass.container.offsetHeight
-    // Rects are in screen pixels; convert back to the container's local pixels if it's scaled
-    const scaleX = containerRect.width / (width || 1) || 1
-    const scaleY = containerRect.height / (height || 1) || 1
-    const scale = Math.sqrt(scaleX * scaleY)
+    const scale = visualScale(glass.container, containerRect)
 
     // Round the filtered output itself (clip-path applies after filter). Safari stops clipping a child to
     // its parent's rounded overflow once the child is composited (e.g. while dragging), which showed the
@@ -467,8 +486,8 @@ function createBackdropCopy(glass: Glass) {
     align(active, containerRect, scale)
     if (own) {
       const wrapperRect = glass.wrapper.getBoundingClientRect()
-      const x = (wrapperRect.left - containerRect.left) / scaleX
-      const y = (wrapperRect.top - containerRect.top) / scaleY
+      const x = (wrapperRect.left - containerRect.left) / scale
+      const y = (wrapperRect.top - containerRect.top) / scale
       const next = `${x},${y},${glass.wrapper.offsetWidth},${glass.wrapper.offsetHeight}`
       if (next !== ownApplied) {
         ownApplied = next
