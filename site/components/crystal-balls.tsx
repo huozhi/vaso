@@ -412,7 +412,7 @@ export function CrystalBalls() {
           specular={0.25}
           style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: FLOOR_HEIGHT }}
         />
-        <button className="crystal-launch theme-label" type="button" onClick={() => { void enableMotionRef.current(); burstRef.current() }} aria-label="弹飞全部小球">
+        <button className="crystal-launch theme-label" type="button" onClick={() => { void enableMotionRef.current(); burstRef.current() }} aria-label="Launch all crystal balls">
           <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 18V5m0 0-5 5m5-5 5 5" />
           </svg>
