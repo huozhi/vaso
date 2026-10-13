@@ -323,6 +323,7 @@
 .crystal-launch:hover {
   background: rgba(127, 145, 145, 0.12);
 }
+
 [data-theme="dark"] .vaso-slider-thumb {
   background-color: #e5e5e579;
 }

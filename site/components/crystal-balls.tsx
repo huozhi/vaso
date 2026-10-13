@@ -18,6 +18,7 @@ const BALLS = [
 const FLOOR_HEIGHT = 36
 
 type Body = { x: number; y: number; vx: number; vy: number; angle: number; radius: number }
+type PermissionedSensor = { requestPermission?: () => Promise<'granted' | 'denied'> }
 
 export function CrystalBalls() {
   const tuning = useGlassTuning()
@@ -25,6 +26,7 @@ export function CrystalBalls() {
   const ballRefs = useRef<(HTMLDivElement | null)[]>([])
   const cornerRefs = useRef<(HTMLButtonElement | null)[]>([])
   const burstRef = useRef<() => void>(() => {})
+  const enableMotionRef = useRef<() => Promise<void>>(async () => {})
 
   useEffect(() => {
     const stage = stageRef.current
@@ -35,6 +37,7 @@ export function CrystalBalls() {
     let start = 0
     let previous = 0
     let tilt = 0
+    let deviceGravity: { x: number; y: number } | null = null
     let drag: { index: number; pointerId: number; offsetX: number; offsetY: number; time: number } | null = null
     let audioContext: AudioContext | null = null
     let lastSound = 0
@@ -165,14 +168,14 @@ export function CrystalBalls() {
         bodies.forEach((body, index) => {
           if (drag?.index === index || elapsed < BALLS[index].delay) return
           if (Math.abs(body.vx) + Math.abs(body.vy) > 0.1 || body.y > body.radius + 0.1) moving = true
-          body.vx += Math.sin(tilt) * 2500 * dt / 2
-          body.vy -= Math.cos(tilt) * 2500 * dt / 2
+          body.vx += (deviceGravity?.x ?? Math.sin(tilt)) * 2500 * dt / 2
+          body.vy += (deviceGravity?.y ?? -Math.cos(tilt)) * 2500 * dt / 2
           body.x += body.vx * dt / 2
           body.y += body.vy * dt / 2
           body.angle += (body.vx / body.radius) * dt * 22
           if (body.y <= body.radius + 0.5) {
             body.vx *= Math.exp(-2.8 * dt / 2)
-            if (Math.abs(body.vx) < 5 && Math.abs(tilt) < 0.002) body.vx = 0
+            if (Math.abs(body.vx) < 5 && Math.abs(deviceGravity?.x ?? Math.sin(tilt)) < 0.002) body.vx = 0
           }
         })
         collide(width, height)
@@ -211,6 +214,52 @@ export function CrystalBalls() {
       })
       start = performance.now() - BALLS[BALLS.length - 1].delay * 1000
       ensureRunning()
+    }
+
+    const screenVector = (x: number, y: number) => {
+      const angle = (screen.orientation?.angle ?? (window as Window & { orientation?: number }).orientation ?? 0) * Math.PI / 180
+      return { x: x * Math.cos(angle) - y * Math.sin(angle), y: x * Math.sin(angle) + y * Math.cos(angle) }
+    }
+    const onOrientation = (event: DeviceOrientationEvent) => {
+      if (event.beta == null || event.gamma == null) return
+      const vector = screenVector(Math.sin(event.gamma * Math.PI / 180), Math.sin(event.beta * Math.PI / 180))
+      deviceGravity = { x: clamp(vector.x, -1, 1), y: -clamp(vector.y, -1, 1) }
+      ensureRunning()
+    }
+    const onMotion = (event: DeviceMotionEvent) => {
+      const acceleration = event.acceleration
+      if (acceleration?.x == null || acceleration.y == null) return
+      const vector = screenVector(acceleration.x, acceleration.y)
+      if (Math.hypot(vector.x, vector.y) < 4) return
+      bodies.forEach((body) => {
+        body.vx += clamp(vector.x * 12, -180, 180)
+        body.vy -= clamp(vector.y * 12, -180, 180)
+      })
+      ensureRunning()
+    }
+    const supported = 'DeviceOrientationEvent' in window && 'DeviceMotionEvent' in window
+    let motionPermission: 'ready' | 'pending' | 'enabled' | 'denied' = 'ready'
+    enableMotionRef.current = async () => {
+      if (!supported || motionPermission !== 'ready') return
+      motionPermission = 'pending'
+      try {
+        const orientation = window.DeviceOrientationEvent as typeof DeviceOrientationEvent & PermissionedSensor
+        const motion = window.DeviceMotionEvent as typeof DeviceMotionEvent & PermissionedSensor
+        // Both requests must start in the same user gesture on iOS.
+        const permissions = await Promise.all([
+          orientation.requestPermission?.() ?? Promise.resolve('granted'),
+          motion.requestPermission?.() ?? Promise.resolve('granted'),
+        ])
+        if (permissions.some((permission) => permission !== 'granted')) {
+          motionPermission = 'denied'
+          return
+        }
+        window.addEventListener('deviceorientation', onOrientation)
+        window.addEventListener('devicemotion', onMotion)
+        motionPermission = 'enabled'
+      } catch {
+        motionPermission = 'denied'
+      }
     }
 
     const pointers = ballRefs.current.map((element, index) => {
@@ -326,6 +375,9 @@ export function CrystalBalls() {
       resize.disconnect()
       stage.removeEventListener('pointerdown', unlockAudio)
       stage.removeEventListener('keydown', unlockAudio)
+      window.removeEventListener('deviceorientation', onOrientation)
+      window.removeEventListener('devicemotion', onMotion)
+      enableMotionRef.current = async () => {}
       if (audioContext) void audioContext.close()
       pointers.forEach((cleanup) => cleanup())
       corners.forEach((cleanup) => cleanup())
@@ -360,7 +412,7 @@ export function CrystalBalls() {
           specular={0.25}
           style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: FLOOR_HEIGHT }}
         />
-        <button className="crystal-launch theme-label" type="button" onClick={() => burstRef.current()} aria-label="弹飞全部小球">
+        <button className="crystal-launch theme-label" type="button" onClick={() => { void enableMotionRef.current(); burstRef.current() }} aria-label="Launch all crystal balls">
           <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 18V5m0 0-5 5m5-5 5 5" />
           </svg>
