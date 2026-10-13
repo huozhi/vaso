@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { Vaso } from 'vaso'
 import { useGlassTuning } from '../contexts/glass-context'
 
@@ -27,7 +27,6 @@ export function CrystalBalls() {
   const cornerRefs = useRef<(HTMLButtonElement | null)[]>([])
   const burstRef = useRef<() => void>(() => {})
   const enableMotionRef = useRef<() => Promise<void>>(async () => {})
-  const [motionStatus, setMotionStatus] = useState<'unavailable' | 'ready' | 'enabled' | 'denied'>('unavailable')
 
   useEffect(() => {
     const stage = stageRef.current
@@ -239,9 +238,10 @@ export function CrystalBalls() {
       ensureRunning()
     }
     const supported = 'DeviceOrientationEvent' in window && 'DeviceMotionEvent' in window
-    if (supported) setMotionStatus('ready')
+    let motionPermission: 'ready' | 'pending' | 'enabled' | 'denied' = 'ready'
     enableMotionRef.current = async () => {
-      if (!supported) return
+      if (!supported || motionPermission !== 'ready') return
+      motionPermission = 'pending'
       try {
         const orientation = window.DeviceOrientationEvent as typeof DeviceOrientationEvent & PermissionedSensor
         const motion = window.DeviceMotionEvent as typeof DeviceMotionEvent & PermissionedSensor
@@ -251,14 +251,14 @@ export function CrystalBalls() {
           motion.requestPermission?.() ?? Promise.resolve('granted'),
         ])
         if (permissions.some((permission) => permission !== 'granted')) {
-          setMotionStatus('denied')
+          motionPermission = 'denied'
           return
         }
         window.addEventListener('deviceorientation', onOrientation)
         window.addEventListener('devicemotion', onMotion)
-        setMotionStatus('enabled')
+        motionPermission = 'enabled'
       } catch {
-        setMotionStatus('denied')
+        motionPermission = 'denied'
       }
     }
 
@@ -412,14 +412,11 @@ export function CrystalBalls() {
           specular={0.25}
           style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: FLOOR_HEIGHT }}
         />
-        <button className="crystal-launch theme-label" type="button" onClick={() => burstRef.current()} aria-label="弹飞全部小球">
+        <button className="crystal-launch theme-label" type="button" onClick={() => { void enableMotionRef.current(); burstRef.current() }} aria-label="弹飞全部小球">
           <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 18V5m0 0-5 5m5-5 5 5" />
           </svg>
         </button>
-        {motionStatus !== 'unavailable' && <button className="crystal-motion theme-label" type="button" onClick={() => void enableMotionRef.current()} disabled={motionStatus === 'enabled'}>
-          {motionStatus === 'enabled' ? 'Motion enabled' : motionStatus === 'denied' ? 'Enable motion again' : 'Enable motion'}
-        </button>}
       </div>
       </div>
     </div>
