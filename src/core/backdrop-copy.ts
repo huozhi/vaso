@@ -40,6 +40,9 @@ const MAX_READY_WAIT = 1000
 // aligned when it scrolls into view
 const VISIBILITY_MARGIN = '100px'
 
+// How far a glass may overhang an ancestor that still counts as its backdrop, in px
+const COVER_TOLERANCE = 2
+
 const FOCUSABLE = 'a[href], area[href], button, input, select, textarea, iframe, summary, [tabindex], [contenteditable]'
 
 // Inherited text styles, copied onto the clone root so it renders like the source in its new place
@@ -403,7 +406,15 @@ function findBackdrop(glass: Glass): Clone | null {
     if (copy === TOO_LARGE) return nearest
     if (copy) {
       nearest ??= copy
-      if (isPainted(getComputedStyle(node)) || [...node.children].some(paintsBehind)) return copy
+      // An ancestor smaller than the glass (a switch track under its bigger knob) leaves the overhang showing the
+      // fill color instead of what's really there, so keep looking for one that covers the glass
+      const rect = node.getBoundingClientRect()
+      const covers =
+        rect.left <= glassRect.left + COVER_TOLERANCE &&
+        rect.top <= glassRect.top + COVER_TOLERANCE &&
+        rect.right >= glassRect.right - COVER_TOLERANCE &&
+        rect.bottom >= glassRect.bottom - COVER_TOLERANCE
+      if (covers && (isPainted(getComputedStyle(node)) || [...node.children].some(paintsBehind))) return copy
     }
   }
   return nearest
