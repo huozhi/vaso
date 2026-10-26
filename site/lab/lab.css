@@ -495,7 +495,7 @@
 .lab-phone {
   position: relative;
   width: 340px;
-  height: 600px;
+  height: 440px;
   max-width: 100%;
   flex: none;
   border-radius: 46px;
@@ -701,7 +701,7 @@
   }
   .lab-phone {
     width: min(340px, 100%);
-    height: 560px;
+    height: 420px;
   }
   .lab-player > img {
     width: 64px;
@@ -732,6 +732,34 @@
   }
   .lab-materials .lab-specimen {
     gap: 28px;
+  }
+}
+
+/* Liquid search on a phone: one column is taller than the stage, so the article sets the height instead, with room
+   under it for the bar, and the masthead puts the title on its own line */
+@container (max-width: 520px) {
+  .lab-merge {
+    height: auto;
+  }
+  .lab-editorial {
+    position: relative;
+    inset: auto;
+    padding: 54px 18px 104px;
+  }
+  .lab-editorial header {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+  .lab-editorial header span {
+    white-space: nowrap;
+  }
+  .lab-editorial header strong {
+    order: -1;
+    flex-basis: 100%;
+    font-size: 24px;
+  }
+  .lab-columns img {
+    height: 96px;
   }
 }
 

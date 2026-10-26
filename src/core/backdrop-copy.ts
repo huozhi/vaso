@@ -493,7 +493,10 @@ function syncMedia(media: MediaPair[]) {
 }
 
 function visualScale(element: HTMLElement, rect: DOMRect) {
-  const boxScale = Math.sqrt((rect.width / (element.offsetWidth || 1)) * (rect.height / (element.offsetHeight || 1))) || 1
+  // offsetWidth/Height are rounded to whole pixels, so a box within a pixel of them isn't scaled. Treating that rounding
+  // as a scale zoomed the copy by a hair, enough to rewrap a line that just fit (the search demo's headline on phones)
+  const unscaled = Math.abs(rect.width - element.offsetWidth) < 1 && Math.abs(rect.height - element.offsetHeight) < 1
+  const boxScale = unscaled ? 1 : Math.sqrt((rect.width / (element.offsetWidth || 1)) * (rect.height / (element.offsetHeight || 1))) || 1
   if (typeof DOMMatrixReadOnly === 'undefined') return boxScale
   let scale = 1
   let transformed = false
