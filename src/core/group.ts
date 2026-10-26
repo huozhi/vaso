@@ -11,7 +11,7 @@ import { Field, type RoundRect } from './field'
 import {
   createCopyLayer,
   createFilter,
-  createWebKitRepaint,
+  createWebKitMaps,
   dispersionBands,
   filterRegion,
   patchFilter,
@@ -107,11 +107,21 @@ export function createGlassGroup(root: HTMLElement, options: GlassGroupOptions =
   let copyLayer: HTMLElement | null = null
   let detachCopy: ReturnType<typeof attachBackdropCopy> | null = null
   let copyBlur = 0
-  // The copy's CSS filter: the SVG filter, then the frost. WebKit needs a nudge to repaint (see createWebKitRepaint)
+  // The copy's CSS filter: the SVG filter, then the frost
   const applyCopyFilter = () => {
-    if (copyLayer && !destroyed) copyLayer.style.filter = `url(#${id}) blur(${copyBlur}px) saturate(${repaint.saturation()})`
+    if (copyLayer && !destroyed) copyLayer.style.filter = `url(#${id}) blur(${copyBlur}px) saturate(${maps.saturation()})`
   }
-  const repaint = createWebKitRepaint(applyCopyFilter)
+  // WebKit's maps load before they're shown, each with the part of the layer it covers (see createWebKitMaps)
+  const areas = new Map<string, typeof area>()
+  const maps = createWebKitMaps((href) => {
+    if (destroyed) return
+    area = areas.get(href) ?? area
+    filter.querySelector('feImage')?.setAttribute('href', href)
+    // The cropped map and the area it covers change in the same frame
+    detachCopy?.refresh()
+    applyCopyFilter()
+  })
+  const shownMap = () => (framed ? maps.shown() : urls[urls.length - 1])
   // The part of the layer WebKit filters, in layer pixels, matching the cropped map
   let area = { x: 0, y: 0, width: 1, height: 1 }
 
@@ -230,7 +240,8 @@ export function createGlassGroup(root: HTMLElement, options: GlassGroupOptions =
     )
     // A rebuilt filter lost its map; put back the current one, which may have been drawn before the filter existed
     const image = filter.querySelector('feImage')
-    if (image && !image.getAttribute('href') && urls.length) image.setAttribute('href', urls[urls.length - 1])
+    const map = shownMap()
+    if (image && !image.getAttribute('href') && map) image.setAttribute('href', map)
     if (copyLayer) {
       copyBlur = framed && blur < WEBKIT_MIN_BLUR ? 0 : blur
       applyCopyFilter()
@@ -292,6 +303,7 @@ export function createGlassGroup(root: HTMLElement, options: GlassGroupOptions =
 
       // Only the area around the members is filtered; the rest of the layer costs nothing on the GPU
       let crop: [number, number, number, number] | undefined
+      let nextArea = area
       if (rects.length) {
         const reach = bezel * Math.abs(current.depth ?? 1) + 24
         const x0 = Math.max(0, Math.floor((Math.min(...rects.map((r) => r.x - r.width / 2)) - reach) / REGION_STEP) * REGION_STEP)
@@ -306,7 +318,7 @@ export function createGlassGroup(root: HTMLElement, options: GlassGroupOptions =
           crop = [Math.floor(x0 / cw), Math.floor(y0 / ch), Math.ceil(x1 / cw), Math.ceil(y1 / ch)]
           crop[2] = Math.max(crop[0] + 1, Math.min(field.cols, crop[2]))
           crop[3] = Math.max(crop[1] + 1, Math.min(field.rows, crop[3]))
-          area = { x: crop[0] * cw, y: crop[1] * ch, width: (crop[2] - crop[0]) * cw, height: (crop[3] - crop[1]) * ch }
+          nextArea = { x: crop[0] * cw, y: crop[1] * ch, width: (crop[2] - crop[0]) * cw, height: (crop[3] - crop[1]) * ch }
         } else {
           const next = `${x0},${y0},${Math.max(1, x1 - x0)},${Math.max(1, y1 - y0)}`
           if (next !== region) {
@@ -320,20 +332,24 @@ export function createGlassGroup(root: HTMLElement, options: GlassGroupOptions =
         }
       } else if (framed) {
         crop = [0, 0, 1, 1]
-        area = { x: 0, y: 0, width: size.width / field.cols, height: size.height / field.rows }
+        nextArea = { x: 0, y: 0, width: size.width / field.cols, height: size.height / field.rows }
       }
 
       const url = field.draw(bezel, crop)
-      filter.querySelector('feImage')?.setAttribute('href', url)
-      if (framed) {
-        repaint.mapChanged(url)
-        applyCopyFilter()
-      }
       urls.push(url)
-      // Keep the previous map until the new one has decoded
-      while (urls.length > 3) URL.revokeObjectURL(urls.shift()!)
-      // The cropped map and the area it covers have to change in the same frame
-      detachCopy?.refresh()
+      if (framed) {
+        // WebKit gets the map once it has loaded, together with the area it covers (see createWebKitMaps)
+        areas.set(url, nextArea)
+        maps.request(url)
+      } else {
+        filter.querySelector('feImage')?.setAttribute('href', url)
+      }
+      // Keep the map on screen, and the ones after it that may still be loading
+      while (urls.length > 3 && urls[0] !== shownMap()) {
+        const old = urls.shift()!
+        areas.delete(old)
+        URL.revokeObjectURL(old)
+      }
     }
     writeFilter()
 

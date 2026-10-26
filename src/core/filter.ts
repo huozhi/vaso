@@ -170,26 +170,36 @@ export function createCopyLayer() {
 }
 
 /**
- * WebKit doesn't repaint an element when only the SVG filter it uses changes, and loads a new map later still, so a
- * changing glass (a press, a ripple, highlights moving) kept its old look until something forced a repaint. A different
- * but equivalent CSS filter makes it rebuild the filter: `mapChanged` flips the saturation by a hair once when the map
- * changes and once the new map has loaded, calling `apply` to write the CSS filter again
+ * Maps for WebKit's copy filter. WebKit loads an <feImage> asynchronously and draws the filter without a map until it
+ * has, so pointing the filter at a new map made the glass flash empty on every change (every keystroke in a search).
+ * It also doesn't repaint an element when only the SVG filter it uses changes, so a changing glass kept its old look
+ * until something forced a repaint. So a new map is loaded off to the side first; once it has, `onReady` puts it in the
+ * filter (`shown`) and the saturation flips by a hair, a different but equivalent CSS filter that makes WebKit rebuild.
+ * While maps change every frame (a press, a ripple, highlights moving), any map newer than the one shown is used as
+ * soon as it loads, so a slow load never stalls the glass
  */
-export function createWebKitRepaint(apply: () => void) {
+export function createWebKitMaps(onReady: (href: string) => void) {
   let flipped = false
-  let current = ''
+  let requested = 0
+  let shownAt = 0
+  let latest = ''
+  let shown = ''
   return {
+    /** The map the filter should use: the newest one that has loaded */
+    shown: () => shown,
     /** The saturation to write into the copy's CSS filter */
     saturation: () => (flipped ? 1.2001 : 1.2),
-    mapChanged(href: string) {
-      if (href === current) return
-      current = href
-      flipped = !flipped
+    request(href: string) {
+      if (href === latest) return
+      latest = href
+      const order = ++requested
       const image = new Image()
       image.onload = () => {
-        if (current !== href) return
+        if (order <= shownAt) return
+        shownAt = order
+        shown = href
         flipped = !flipped
-        apply()
+        onReady(href)
       }
       image.src = href
     },
