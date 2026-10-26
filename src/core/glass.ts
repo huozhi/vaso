@@ -1,31 +1,27 @@
 // A glass on any element, without a framework. `createGlass` owns everything the effect needs inside the element:
 // the glass layer, its SVG filter, measuring, displacement maps, and the backdrop copy for Safari and Firefox.
 
+import { attachBackdropCopy, GLASS_LAYER_ATTRIBUTE, GLASS_ROOT_ATTRIBUTE } from './backdrop-copy'
 import {
-  attachBackdropCopy,
-  FRAME_ATTRIBUTE,
-  FRAME_AXES_ATTRIBUTE,
-  FRAME_SCALE_ATTRIBUTE,
-  GLASS_LAYER_ATTRIBUTE,
-  GLASS_ROOT_ATTRIBUTE,
-} from './backdrop-copy'
+  createCopyLayer,
+  createFilter,
+  createWebKitRepaint,
+  dispersionBands,
+  filterRegion,
+  patchFilter,
+  type Primitive,
+  refractionPrimitives,
+  setAttributes,
+} from './filter'
 import {
   BEZEL_RATIO,
   createSpecularShadow,
-  DISPERSION,
   drawLiveMap,
   getDisplacementMap,
-  getSpectrum,
-  MAX_COPY_SPECTRUM_SAMPLES,
-  MAX_COPY_SPECTRUM_STEP,
-  MAX_SPECTRUM_SAMPLES,
   type Outset,
   REFRACTION,
   resolveOutset,
   RESIZE_SETTLE_MS,
-  SMALL_GLASS_SIZE,
-  SMALL_GLASS_SPECTRUM_SAMPLES,
-  SPECTRUM_STEP,
 } from './optics'
 import { getSvgBackdropSupport, isWebKit, WEBKIT_MIN_BLUR } from './support'
 import { type Light, lightAngle, watchPointer } from './light'
@@ -96,10 +92,6 @@ type Settings = {
   ripple: boolean
 }
 
-// A filter primitive as tag and attributes, so the filter can be patched in place instead of rebuilt
-type Primitive = [tag: string, attributes: Record<string, string | number>]
-
-const SVG_NS = 'http://www.w3.org/2000/svg'
 let glassCount = 0
 
 function settle(options: GlassOptions): Settings {
@@ -185,11 +177,12 @@ export function createGlass(root: HTMLElement, options: GlassOptions = {}): Glas
   const press = { value: 0, velocity: 0, target: 0, at: { x: 0, y: 0 } }
   let ripples: { x: number; y: number; t0: number }[] = []
   let liveHref: string | null = null
-  // The map the copy's filter was last repainted for (WebKit), and the hair the saturation alternates by
-  let nudgedHref = ''
-  let nudge = false
-  let copyFrost = ''
-  const copyFilter = () => `url(#${id}) ${nudge ? copyFrost.replace('saturate(1.2)', 'saturate(1.2001)') : copyFrost}`
+  // The copy's CSS filter: the SVG filter, then the frost
+  let copyBlur = 0
+  const copyFilter = () => `url(#${id}) blur(${copyBlur}px) saturate(${repaint.saturation()})`
+  const repaint = createWebKitRepaint(() => {
+    if (!destroyed && copyLayer) copyLayer.style.filter = copyFilter()
+  })
   let liveFrame = 0
   let liveLast = 0
 
@@ -246,18 +239,13 @@ export function createGlass(root: HTMLElement, options: GlassOptions = {}): Glas
     // The map stores unit vectors in [-0.5, 0.5], so double the scale to reach full offset
     // A press deepens the lens as the glass swells
     const scale = 2 * depth * bezel * REFRACTION * (1 + 0.3 * press.value)
-    // Total separation in pixels between the red and violet images at the rim
-    // Flat glass doesn't refract, so fade dispersion out as depth approaches zero
-    // Small glass has a narrow rim, where extra bands are indistinguishable; each band is a full displacement pass
-    const sizeSamples =
-      geometry && Math.min(geometry.width, geometry.height) < SMALL_GLASS_SIZE ? SMALL_GLASS_SPECTRUM_SAMPLES : Infinity
-    const maxSamples = Math.min(copyMode ? MAX_COPY_SPECTRUM_SAMPLES : MAX_SPECTRUM_SAMPLES, sizeSamples)
-    const fullSpreadPx = dispersion ? Math.max(dispersion, 0) * bezel * DISPERSION * Math.min(1, Math.abs(depth) * 4) : 0
-    // The copy's few bands can't cover a wide spread without splitting into colored ghosts of every edge, so
-    // narrow it there to what they blend smoothly
-    const spreadPx = copyMode ? Math.min(fullSpreadPx, (maxSamples - 1) * MAX_COPY_SPECTRUM_STEP) : fullSpreadPx
-    const spectrum =
-      spreadPx > 0.5 ? getSpectrum(Math.min(maxSamples, Math.max(3, Math.ceil(spreadPx / SPECTRUM_STEP) + 1))) : null
+    const { spread, spectrum } = dispersionBands({
+      bezel,
+      depth,
+      dispersion,
+      shorterSide: geometry ? Math.min(geometry.width, geometry.height) : Infinity,
+      copy: copyMode,
+    })
 
     // WebKit sizes the copy's filter by a frame around the whole copy instead of by the glass, so the filter is
     // written in fractions of that frame, which backdrop-copy.ts measures. Pixel values go in data attributes for it
@@ -282,17 +270,7 @@ export function createGlass(root: HTMLElement, options: GlassOptions = {}): Glas
 
     if (useCopyFilter && geometry) {
       if (!copyWrap || !copyLayer) {
-        // Safari can paint filtered pixels outside clip-path and rounded overflow, so a mask clips them. It sits on
-        // a wrapper: on the filtered layer itself, it makes WebKit size the filter by the layer alone
-        copyWrap = document.createElement('span')
-        copyWrap.setAttribute('aria-hidden', 'true')
-        Object.assign(copyWrap.style, { position: 'absolute', inset: '0', overflow: 'hidden' })
-        copyWrap.style.setProperty('-webkit-mask-image', '-webkit-radial-gradient(white, black)')
-        // Sized to the glass so the filter's coordinates line up with the displacement map. Its children are
-        // managed by backdrop-copy.ts
-        copyLayer = document.createElement('span')
-        Object.assign(copyLayer.style, { position: 'absolute', top: '0', left: '0' })
-        copyWrap.appendChild(copyLayer)
+        ;({ wrap: copyWrap, layer: copyLayer } = createCopyLayer())
         glassLayer.appendChild(copyWrap)
       }
       const layerStyle = copyLayer.style
@@ -304,27 +282,14 @@ export function createGlass(root: HTMLElement, options: GlassOptions = {}): Glas
       // refraction samples next to the rim, where a rounded edge is transparent and leaves a colored fringe in
       // the bands that bend least. clip-path rounds the filtered output instead
       layerStyle.overflow = framed ? 'visible' : 'hidden'
-      // WebKit doesn't repaint an element when only the SVG filter it uses changes, and loads a new map later
-      // still, so a press or ripple froze on its first frame until a layout. An equivalent but different CSS
-      // filter makes it rebuild: once when the map changes, and once the new map has loaded
-      const href = liveHref ?? geometry.href
-      if (framed && href !== nudgedHref) {
-        nudgedHref = href
-        nudge = !nudge
-        const image = new Image()
-        image.onload = () => {
-          if (destroyed || nudgedHref !== href || !copyLayer) return
-          nudge = !nudge
-          copyLayer.style.filter = copyFilter()
-        }
-        image.src = href
-      }
-      copyFrost = frost
+      // A press or ripple changes the map every frame, which WebKit wouldn't repaint (see createWebKitRepaint)
+      if (framed) repaint.mapChanged(liveHref ?? geometry.href)
+      copyBlur = visibleBlur
       layerStyle.filter = copyFilter()
     }
 
     if ((useSvgFilter || useCopyFilter) && geometry) {
-      writeFilter(geometry, scale, spreadPx, spectrum, framed)
+      writeFilter(geometry, scale, spread, spectrum, framed)
     }
 
     // Clone what's behind the glass into it and keep the clone aligned (see backdrop-copy.ts)
@@ -338,105 +303,27 @@ export function createGlass(root: HTMLElement, options: GlassOptions = {}): Glas
     }
   }
 
-  const writeFilter = (geometry: Geometry, scale: number, spreadPx: number, spectrum: string[] | null, framed: boolean) => {
+  const writeFilter = (geometry: Geometry, scale: number, spread: number, spectrum: string[] | null, framed: boolean) => {
     if (!svg || !filter) {
-      svg = document.createElementNS(SVG_NS, 'svg')
-      svg.setAttribute('aria-hidden', 'true')
-      svg.setAttribute('focusable', 'false')
-      svg.setAttribute('width', '0')
-      svg.setAttribute('height', '0')
-      Object.assign(svg.style, { position: 'fixed', top: '0', left: '0', pointerEvents: 'none' })
-      const defs = document.createElementNS(SVG_NS, 'defs')
-      filter = document.createElementNS(SVG_NS, 'filter')
-      filter.setAttribute('id', id)
-      defs.appendChild(filter)
-      svg.appendChild(defs)
+      ;({ svg, filter } = createFilter(id))
       // Right after the layer, ahead of the content; backdrop-copy.ts recognizes it as the glass's own <svg>
       glassLayer.after(svg)
     }
-
     // Framed filters keep the whole frame as their region: WebKit misplaces the source for a smaller one.
     // Each primitive is limited to the glass instead, which also keeps the work to the glass's size
-    setAttributes(filter, {
-      filterUnits: framed ? 'objectBoundingBox' : 'userSpaceOnUse',
-      primitiveUnits: framed ? 'objectBoundingBox' : 'userSpaceOnUse',
-      'color-interpolation-filters': 'sRGB',
-      x: 0,
-      y: 0,
-      width: framed ? 1 : geometry.width,
-      height: framed ? 1 : geometry.height,
-    })
-
-    type Attributes = Primitive[1]
-    const inFrame: Attributes = framed ? { [FRAME_ATTRIBUTE]: '' } : {}
-    const scaleOf = (px: number): Attributes => (framed ? { [FRAME_SCALE_ATTRIBUTE]: px } : { scale: px })
-    const next: Primitive[] = framed
-      ? [
-          ['feImage', { ...inFrame, href: liveHref ?? geometry.href, preserveAspectRatio: 'none', result: 'rawMap' }],
-          // Rescales the map's axes for a frame of another aspect ratio than the glass's
-          ['feColorMatrix', { ...inFrame, [FRAME_AXES_ATTRIBUTE]: '', in: 'rawMap', type: 'matrix', result: 'map' }],
-        ]
-      : [
-          [
-            'feImage',
-            { href: liveHref ?? geometry.href, x: 0, y: 0, width: geometry.width, height: geometry.height, preserveAspectRatio: 'none', result: 'map' },
-          ],
-        ]
-    if (spectrum) {
-      spectrum.forEach((matrix, i) => {
-        next.push([
-          'feDisplacementMap',
-          {
-            ...inFrame,
-            ...scaleOf(scale + spreadPx * (i / (spectrum.length - 1) - 0.5) * 2),
-            in: 'SourceGraphic',
-            in2: 'map',
-            xChannelSelector: 'R',
-            yChannelSelector: 'G',
-            result: `displaced${i}`,
-          },
-        ])
-        next.push(['feColorMatrix', { ...inFrame, in: `displaced${i}`, type: 'matrix', values: matrix, result: `band${i}` }])
-        if (i > 0) {
-          next.push([
-            'feComposite',
-            {
-              ...inFrame,
-              in: i === 1 ? 'band0' : `spectrum${i - 1}`,
-              in2: `band${i}`,
-              operator: 'lighter',
-              result: `spectrum${i}`,
-            },
-          ])
-        }
-      })
-    } else {
-      next.push([
-        'feDisplacementMap',
-        { ...inFrame, ...scaleOf(scale), in: 'SourceGraphic', in2: 'map', xChannelSelector: 'R', yChannelSelector: 'G' },
-      ])
-    }
-
-    // Patch in place when the structure is the same. backdrop-copy.ts positions framed primitives itself, and
-    // rebuilding them on every animated change would drop those positions for a frame
-    const elements = Array.from(filter.children)
-    const sameShape = elements.length === next.length && next.every(([tag], i) => elements[i].localName === tag)
-    if (sameShape) {
-      next.forEach(([, attributes], i) => {
-        const previous = filterPrimitives[i]?.[1] ?? {}
-        for (const name of Object.keys(previous)) if (!(name in attributes)) elements[i].removeAttribute(name)
-        setAttributes(elements[i], attributes)
-      })
-    } else {
-      filter.replaceChildren(
-        ...next.map(([tag, attributes]) => {
-          const element = document.createElementNS(SVG_NS, tag)
-          setAttributes(element, attributes)
-          return element
-        }),
-      )
-    }
-    filterPrimitives = next
+    setAttributes(filter, filterRegion(framed, { x: 0, y: 0, width: geometry.width, height: geometry.height }))
+    const href = liveHref ?? geometry.href
+    filterPrimitives = patchFilter(
+      filter,
+      refractionPrimitives({
+        framed,
+        map: framed ? { href } : { href, x: 0, y: 0, width: geometry.width, height: geometry.height },
+        scale,
+        spread,
+        spectrum,
+      }),
+      filterPrimitives,
+    )
   }
 
   // How long a ripple runs, and how fast and wide its ring is
@@ -579,12 +466,5 @@ export function createGlass(root: HTMLElement, options: GlassOptions = {}): Glas
       copyWrap?.remove()
       if (ownsContainer) glassLayer.remove()
     },
-  }
-}
-
-function setAttributes(element: Element, attributes: Record<string, string | number>) {
-  for (const [name, value] of Object.entries(attributes)) {
-    const text = String(value)
-    if (element.getAttribute(name) !== text) element.setAttribute(name, text)
   }
 }

@@ -108,25 +108,44 @@ export type VasoProps<Element extends HTMLElement = HTMLDivElement> = React.HTML
   ripple?: boolean
 }
 
-const Vaso = React.forwardRef<HTMLElement, VasoProps>(function Vaso({
-  component: WrapComponent = 'div',
-  children,
-  width,
-  height,
-  outset,
-  px,
-  py,
-  radius,
-  depth = 0,
-  blur = 0.1,
-  dispersion = 0.5,
-  specular = 0.5,
-  light,
-  pressable,
-  ripple,
-  style,
-  ...htmlProps
-}, ref) {
+// A group draws its members' glass with its own settings, so these props do nothing on a member
+const GROUP_OWNED = ['width', 'height', 'depth', 'blur', 'dispersion', 'specular', 'light', 'pressable', 'ripple'] as const
+const warned = new Set<string>()
+function warnGroupOwned(props: VasoProps) {
+  const env = (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV
+  if (env === 'production') return
+  for (const key of GROUP_OWNED) {
+    if (props[key] === undefined || warned.has(key)) continue
+    warned.add(key)
+    console.warn(
+      `vaso: \`${key}\` on a <Vaso> inside a <VasoGroup> is ignored; the group draws its members' glass. ` +
+        (key === 'pressable' || key === 'ripple' || key === 'width' || key === 'height'
+          ? 'Groups don\'t support it yet.'
+          : `Set it on the <VasoGroup> instead.`),
+    )
+  }
+}
+
+const Vaso = React.forwardRef<HTMLElement, VasoProps>(function Vaso(props, ref) {
+  const {
+    component: WrapComponent = 'div',
+    children,
+    width,
+    height,
+    outset,
+    px,
+    py,
+    radius,
+    depth = 0,
+    blur = 0.1,
+    dispersion = 0.5,
+    specular = 0.5,
+    light,
+    pressable,
+    ripple,
+    style,
+    ...htmlProps
+  } = props
   const id = `vaso-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`
   const rootRef = useRef<HTMLElement>(null)
   const glassRef = useRef<Glass | null>(null)
@@ -154,6 +173,7 @@ const Vaso = React.forwardRef<HTMLElement, VasoProps>(function Vaso({
   useIsomorphicLayoutEffect(() => {
     const root = rootRef.current!
     if (group) {
+      warnGroupOwned(props)
       // Inside a group the group draws the glass; this element only lends it its shape
       const layer = root.querySelector<HTMLElement>(':scope > [data-vaso]')
       if (layer) layer.style.display = 'none'

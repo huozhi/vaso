@@ -71,7 +71,7 @@ group follows them every frame.
 | `depth`, `blur`, `dispersion`, `specular`, `light` | | | As on `<Vaso>`, for the whole group (`depth` defaults to `1`) |
 | `overflow` | `number` | `64` | How far past the group's box members may reach and still be glass |
 
-Members keep their own `outset` and `radius`; the group's props decide how the glass looks. In Safari and Firefox the
+Members keep their own `outset` and `radius`; the group's props decide how the glass looks. The other glass props (`depth`, `blur`, `light`, ...) belong on the group, and members don't support `pressable` or `ripple` yet; setting them on a member logs a warning in development. In Safari and Firefox the
 group refracts a copy of the backdrop, like a single `<Vaso>` does there.
 
 ### Browser Support

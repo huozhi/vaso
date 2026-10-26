@@ -6,30 +6,22 @@
 // Chromium refracts the real backdrop. Safari and Firefox refract a copy of it instead, like a single glass does
 // (see backdrop-copy.ts): the copy fills the group's layer and the same filter cuts it to the members' shape.
 
-import {
-  attachBackdropCopy,
-  FRAME_ATTRIBUTE,
-  FRAME_AXES_ATTRIBUTE,
-  FRAME_SCALE_ATTRIBUTE,
-  GLASS_LAYER_ATTRIBUTE,
-} from './backdrop-copy'
+import { attachBackdropCopy, GLASS_LAYER_ATTRIBUTE } from './backdrop-copy'
 import { Field, type RoundRect } from './field'
+import {
+  createCopyLayer,
+  createFilter,
+  createWebKitRepaint,
+  dispersionBands,
+  filterRegion,
+  patchFilter,
+  type Primitive,
+  refractionPrimitives,
+  setAttributes,
+} from './filter'
 import { Highlights, type Look } from './highlights'
 import { type Light, lightPoint, watchPointer } from './light'
-import {
-  BEZEL_RATIO,
-  DISPERSION,
-  getSpectrum,
-  MAX_COPY_SPECTRUM_SAMPLES,
-  MAX_COPY_SPECTRUM_STEP,
-  MAX_SPECTRUM_SAMPLES,
-  type Outset,
-  REFRACTION,
-  resolveOutset,
-  SMALL_GLASS_SIZE,
-  SMALL_GLASS_SPECTRUM_SAMPLES,
-  SPECTRUM_STEP,
-} from './optics'
+import { BEZEL_RATIO, type Outset, REFRACTION, resolveOutset } from './optics'
 import { getSvgBackdropSupport, isWebKit, WEBKIT_MIN_BLUR } from './support'
 
 export type GlassGroupOptions = {
@@ -76,7 +68,6 @@ export type GlassGroup = {
 
 type Member = { sides: { top: number; right: number; bottom: number; left: number }; radius?: number }
 
-const SVG_NS = 'http://www.w3.org/2000/svg'
 // Filter regions snap to this grid so moving members don't rewrite the filter every frame
 const REGION_STEP = 32
 let groupCount = 0
@@ -104,18 +95,9 @@ export function createGlassGroup(root: HTMLElement, options: GlassGroupOptions =
   canvas.setAttribute('aria-hidden', 'true')
   Object.assign(canvas.style, { position: 'absolute', pointerEvents: 'none' })
 
-  const svg = document.createElementNS(SVG_NS, 'svg')
-  svg.setAttribute('aria-hidden', 'true')
-  svg.setAttribute('focusable', 'false')
-  svg.setAttribute('width', '0')
-  svg.setAttribute('height', '0')
-  Object.assign(svg.style, { position: 'fixed', top: '0', left: '0', pointerEvents: 'none' })
-  const filter = document.createElementNS(SVG_NS, 'filter')
-  filter.setAttribute('id', id)
-  filter.setAttribute('filterUnits', 'userSpaceOnUse')
-  filter.setAttribute('primitiveUnits', 'userSpaceOnUse')
-  filter.setAttribute('color-interpolation-filters', 'sRGB')
-  svg.appendChild(document.createElementNS(SVG_NS, 'defs')).appendChild(filter)
+  const { svg, filter } = createFilter(id)
+  setAttributes(filter, { filterUnits: 'userSpaceOnUse', primitiveUnits: 'userSpaceOnUse', 'color-interpolation-filters': 'sRGB' })
+  let primitives: Primitive[] = []
 
   // Without backdrop refraction (Safari, Firefox) the layer holds a copy of the backdrop, filtered with `filter`.
   // WebKit sizes that filter by a frame around the whole copy, so it's written in fractions of the frame, which
@@ -125,15 +107,11 @@ export function createGlassGroup(root: HTMLElement, options: GlassGroupOptions =
   let copyLayer: HTMLElement | null = null
   let detachCopy: ReturnType<typeof attachBackdropCopy> | null = null
   let copyBlur = 0
-  let nudge = false
+  // The copy's CSS filter: the SVG filter, then the frost. WebKit needs a nudge to repaint (see createWebKitRepaint)
   const applyCopyFilter = () => {
-    // The saturation alternates by a hair: equivalent to the eye, but a new style for WebKit (see repaintCopy)
-    if (copyLayer) copyLayer.style.filter = `url(#${id}) blur(${copyBlur}px) saturate(${nudge ? 1.2001 : 1.2})`
+    if (copyLayer && !destroyed) copyLayer.style.filter = `url(#${id}) blur(${copyBlur}px) saturate(${repaint.saturation()})`
   }
-  const repaintCopy = () => {
-    nudge = !nudge
-    applyCopyFilter()
-  }
+  const repaint = createWebKitRepaint(applyCopyFilter)
   // The part of the layer WebKit filters, in layer pixels, matching the cropped map
   let area = { x: 0, y: 0, width: 1, height: 1 }
 
@@ -141,14 +119,11 @@ export function createGlassGroup(root: HTMLElement, options: GlassGroupOptions =
   if (copyMode) {
     // Marked as glass, so this copy and the copies of other glasses leave the layer, rim canvas and filter out
     for (const el of [layer, canvas, svg]) el.setAttribute(GLASS_LAYER_ATTRIBUTE, el === layer ? id : '')
-    // Safari can paint filtered pixels outside the box; the mask keeps them in
-    const wrap = document.createElement('span')
-    Object.assign(wrap.style, { position: 'absolute', inset: '0', overflow: 'hidden' })
-    wrap.style.setProperty('-webkit-mask-image', '-webkit-radial-gradient(white, black)')
-    copyLayer = document.createElement('span')
-    Object.assign(copyLayer.style, { position: 'absolute', top: '0', left: '0', overflow: framed ? 'visible' : 'hidden' })
-    wrap.appendChild(copyLayer)
-    layer.append(wrap)
+    const copy = createCopyLayer()
+    copyLayer = copy.layer
+    // Overflow visible in WebKit, which measures a frame around the copy anyway (see glass.ts)
+    copyLayer.style.overflow = framed ? 'visible' : 'hidden'
+    layer.append(copy.wrap)
     layer.after(canvas, svg)
   } else {
     layer.after(canvas, svg)
@@ -222,92 +197,44 @@ export function createGlassGroup(root: HTMLElement, options: GlassGroupOptions =
   const writeFilter = () => {
     const depth = current.depth ?? 1
     const blur = current.blur ?? 0.1
-    const dispersion = current.dispersion ?? 0.5
     // The map stores unit vectors, so double the scale to reach the full offset (as a single glass does)
     const scale = 2 * depth * bezel * REFRACTION
-    const shorter = rects.length ? Math.min(...rects.map((r) => Math.min(r.width, r.height))) : 0
-    const maxSamples = Math.min(
-      copyMode ? MAX_COPY_SPECTRUM_SAMPLES : MAX_SPECTRUM_SAMPLES,
-      shorter < SMALL_GLASS_SIZE ? SMALL_GLASS_SPECTRUM_SAMPLES : Infinity,
-    )
-    const fullSpreadPx = dispersion ? Math.max(dispersion, 0) * bezel * DISPERSION * Math.min(1, Math.abs(depth) * 4) : 0
-    // A copy's few bands can't cover a wide spread without splitting into colored ghosts (see glass.ts)
-    const spreadPx = copyMode ? Math.min(fullSpreadPx, (maxSamples - 1) * MAX_COPY_SPECTRUM_STEP) : fullSpreadPx
-    const spectrum = spreadPx > 0.5 ? getSpectrum(Math.min(maxSamples, Math.max(3, Math.ceil(spreadPx / SPECTRUM_STEP) + 1))) : null
+    const { spread, spectrum } = dispersionBands({
+      bezel,
+      depth,
+      dispersion: current.dispersion ?? 0.5,
+      shorterSide: rects.length ? Math.min(...rects.map((r) => Math.min(r.width, r.height))) : 0,
+      copy: copyMode,
+    })
 
-    const key = `${scale.toFixed(2)}|${spreadPx.toFixed(2)}|${spectrum?.length ?? 0}|${blur}|${size.width}x${size.height}`
+    const key = `${scale.toFixed(2)}|${spread.toFixed(2)}|${spectrum?.length ?? 0}|${blur}|${size.width}x${size.height}`
     if (key === filterKey) return
-    const rebuild = !filterKey || filterKey.split('|')[2] !== key.split('|')[2]
     filterKey = key
-    // Framed primitives are placed at the layer inside the frame by backdrop-copy.ts
-    const create = (tag: string, attributes: Record<string, string>) => {
-      const el = document.createElementNS(SVG_NS, tag)
-      if (framed) el.setAttribute(FRAME_ATTRIBUTE, '')
-      for (const [name, value] of Object.entries(attributes)) el.setAttribute(name, value)
-      return el
-    }
-    // The copy is blurred by CSS after the filter; the real backdrop is blurred inside it
-    const source = copyMode ? 'SourceGraphic' : 'source'
-    const displacement = (result: string) =>
-      create('feDisplacementMap', { in: source, in2: 'map', xChannelSelector: 'R', yChannelSelector: 'G', result })
-    if (rebuild) {
-      const nodes: SVGElement[] = []
-      if (framed) {
-        nodes.push(create('feImage', { preserveAspectRatio: 'none', result: 'rawMap' }))
-        // Rescales the map's axes for a frame of another aspect ratio than the layer's
-        nodes.push(create('feColorMatrix', { [FRAME_AXES_ATTRIBUTE]: '', in: 'rawMap', type: 'matrix', result: 'map' }))
-      } else {
-        nodes.push(create('feImage', { preserveAspectRatio: 'none', result: 'map' }))
-      }
-      // Coverage lives in the map's blue channel; it becomes the alpha that cuts out the members' shape
-      nodes.push(create('feColorMatrix', { in: 'map', type: 'matrix', values: '0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 1 0 0', result: 'mask' }))
-      if (!copyMode) nodes.push(create('feGaussianBlur', { in: 'SourceGraphic', result: 'source' }))
-      if (spectrum) {
-        spectrum.forEach((matrix, i) => {
-          nodes.push(displacement(`displaced${i}`))
-          nodes.push(create('feColorMatrix', { in: `displaced${i}`, type: 'matrix', values: matrix, result: `band${i}` }))
-          if (i > 0) {
-            nodes.push(
-              create('feComposite', {
-                in: i === 1 ? 'band0' : `spectrum${i - 1}`,
-                in2: `band${i}`,
-                operator: 'lighter',
-                result: i === spectrum.length - 1 ? 'refracted' : `spectrum${i}`,
-              }),
-            )
-          }
-        })
-      } else {
-        nodes.push(displacement('refracted'))
-      }
-      nodes.push(create('feComposite', { in: 'refracted', in2: 'mask', operator: 'in' }))
-      filter.replaceChildren(...nodes)
-      // The current map, which may have been drawn before the filter existed
-      if (urls.length) nodes[0].setAttribute('href', urls[urls.length - 1])
-    }
-    if (framed) {
-      // The whole frame is the region: WebKit misplaces the source for a smaller one
-      for (const [name, value] of Object.entries({ filterUnits: 'objectBoundingBox', primitiveUnits: 'objectBoundingBox', x: '0', y: '0', width: '1', height: '1' })) {
-        filter.setAttribute(name, value)
-      }
-    } else {
-      const image = filter.querySelector('feImage')!
-      image.setAttribute('x', '0')
-      image.setAttribute('y', '0')
-      image.setAttribute('width', String(size.width))
-      image.setAttribute('height', String(size.height))
-    }
-    filter.querySelector('feGaussianBlur')?.setAttribute('stdDeviation', String(blur))
+    // The whole frame is the region when framed: WebKit misplaces the source for a smaller one. Otherwise the region
+    // follows the members (see tick)
+    if (framed) setAttributes(filter, filterRegion(true, { x: 0, y: 0, width: 1, height: 1 }))
+    primitives = patchFilter(
+      filter,
+      refractionPrimitives({
+        framed,
+        // The href is set as the members move, in tick
+        map: framed ? {} : { x: 0, y: 0, width: size.width, height: size.height },
+        scale,
+        spread,
+        spectrum,
+        // The real backdrop is blurred inside the filter; a copy is blurred by CSS after it
+        blur: copyMode ? undefined : blur,
+        mask: true,
+      }),
+      primitives,
+    )
+    // A rebuilt filter lost its map; put back the current one, which may have been drawn before the filter existed
+    const image = filter.querySelector('feImage')
+    if (image && !image.getAttribute('href') && urls.length) image.setAttribute('href', urls[urls.length - 1])
     if (copyLayer) {
       copyBlur = framed && blur < WEBKIT_MIN_BLUR ? 0 : blur
       applyCopyFilter()
     }
-    const maps = filter.querySelectorAll('feDisplacementMap')
-    maps.forEach((map, i) => {
-      const offset = maps.length > 1 ? spreadPx * (i / (maps.length - 1) - 0.5) * 2 : 0
-      // Framed scales are in pixels here and converted to frame units by backdrop-copy.ts
-      map.setAttribute(framed ? FRAME_SCALE_ATTRIBUTE : 'scale', String(scale + offset))
-    })
 
     // Copy what's behind the group into the layer and keep it aligned
     if (copyLayer && !detachCopy) {
@@ -399,15 +326,8 @@ export function createGlassGroup(root: HTMLElement, options: GlassGroupOptions =
       const url = field.draw(bezel, crop)
       filter.querySelector('feImage')?.setAttribute('href', url)
       if (framed) {
-        // WebKit doesn't repaint an element when only the SVG filter it uses changes, and loads the new map later
-        // still, so the glass kept its old shape until something else forced a repaint (a layout, a scroll). A
-        // different but equivalent CSS filter makes it rebuild the filter: once now, and once the map has loaded
-        repaintCopy()
-        const image = new Image()
-        image.onload = () => {
-          if (!destroyed && urls.includes(url)) repaintCopy()
-        }
-        image.src = url
+        repaint.mapChanged(url)
+        applyCopyFilter()
       }
       urls.push(url)
       // Keep the previous map until the new one has decoded
