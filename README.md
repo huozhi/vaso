@@ -67,6 +67,23 @@ Safari and Firefox don't render those, so Vaso refracts a copy of what's behind 
 
 Limits: sources larger than 400 elements aren't cloned (the glass keeps its blur and rim instead), and CSS that depends on an ancestor outside the cloned element may style the copy differently. Glass far outside the viewport pauses its copy until it scrolls back near it.
 
+## Without React: `vaso/core`
+
+The glass itself has no framework dependency. `createGlass` turns any element into glass; the `<Vaso>` component
+is a thin wrapper around it, so both behave the same, including the Safari and Firefox fallback.
+
+```js
+import { createGlass } from 'vaso/core'
+
+const glass = createGlass(document.querySelector('.toolbar'), { depth: 1.2, blur: 0.5, outset: 4 })
+
+glass.update({ depth: 2 }) // merges into the current options; cheap enough for every animation frame
+glass.destroy() // removes everything the glass added
+```
+
+Options are the props above, without `component` and `children`. The element's own content stays on top of
+the glass.
+
 ## Examples
 
 ### Glass around content

@@ -51,7 +51,7 @@ All standard HTML attributes (className, style, onClick, ...) pass through to th
 | `specular` | number \| false | `0.5` | 0–1 | Rim highlight intensity |
 | `px` / `py` | number | – | – | Deprecated, use `outset={{ x, y }}` |
 
-Exports: `Vaso`, and the types `VasoProps`, `Outset`.
+Exports: `Vaso`, and the types `VasoProps`, `Outset`. From `vaso/core`: `createGlass`, `initialGlassStyle`, `resolveOutset`, `supportsBackdropRefraction`, and the types `Glass`, `GlassOptions`, `Outset`.
 
 ## Recipes
 
@@ -77,6 +77,19 @@ Concave lens: `<Vaso width={60} height={60} radius={30} depth={-4} dispersion={1
 Frosted panel: `<Vaso radius={20} depth={0.3} blur={6} specular={0.9}>…</Vaso>`
 
 Good starting values: controls `depth 1–1.5, blur 0.3–1`; lenses `depth 2–3`; panels `depth 0.2–0.5, blur 4–8`.
+
+## Without React
+
+`vaso/core` is the same glass without a framework; `<Vaso>` wraps it.
+
+```js
+import { createGlass } from 'vaso/core'
+const glass = createGlass(element, { depth: 1.2, blur: 0.5 })
+glass.update({ depth: 2 })
+glass.destroy()
+```
+
+Options match the props, minus `component` and `children`. `update` merges into the current options.
 
 ## How it renders
 
