@@ -101,10 +101,10 @@ export type VasoProps<Element extends HTMLElement = HTMLDivElement> = React.HTML
    */
   light?: Light
 
-  /** Swell under a press, with a small lens forming under the finger */
+  /** Swell under a press, with a small lens forming under the finger. Settles without overshoot when the visitor prefers reduced motion */
   pressable?: boolean
 
-  /** Send a ripple through the glass from every tap */
+  /** Send a ripple through the glass from every tap. Off when the visitor prefers reduced motion */
   ripple?: boolean
 }
 

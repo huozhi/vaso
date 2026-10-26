@@ -54,8 +54,8 @@ function App() {
 | `dispersion` | `number \| false` | `0.5` | `0-3.0` | Spectral (rainbow) dispersion along the refracting edge, like Figma's glass. Scales with the glass size and fades out as `depth` approaches 0 |
 | `specular` | `number \| false` | `0.5` | `0-1.0` | Intensity of the specular rim highlight |
 | `light` | `number \| 'pointer'` | top left | `0-360` | Where the light comes from: an angle in degrees (0 above, 90 right), or `'pointer'` to follow the cursor |
-| `pressable` | `boolean` | `false` | - | Swell under a press, with a small lens forming under the finger |
-| `ripple` | `boolean` | `false` | - | Send a ripple through the glass from every tap |
+| `pressable` | `boolean` | `false` | - | Swell under a press, with a small lens forming under the finger. Settles without overshoot with reduced motion |
+| `ripple` | `boolean` | `false` | - | Send a ripple through the glass from every tap. Off with reduced motion |
 
 `<Vaso>` forwards `ref` to its root element.
 

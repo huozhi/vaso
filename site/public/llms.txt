@@ -50,8 +50,8 @@ All standard HTML attributes (className, style, onClick, ...) pass through to th
 | `dispersion` | number \| false | `0.5` | 0–3 | Rainbow split along the refracting edge. Fades out as depth → 0 |
 | `specular` | number \| false | `0.5` | 0–1 | Rim highlight intensity |
 | `light` | number \| `'pointer'` | top left | 0–360 | Where the light comes from: degrees (0 above, 90 right) or `'pointer'` to follow the cursor |
-| `pressable` | boolean | `false` | – | Swells under a press, with a small lens under the finger |
-| `ripple` | boolean | `false` | – | A ripple runs through the glass from every tap |
+| `pressable` | boolean | `false` | – | Swells under a press, with a small lens under the finger; no overshoot with `prefers-reduced-motion` |
+| `ripple` | boolean | `false` | – | A ripple runs through the glass from every tap; off with `prefers-reduced-motion` |
 
 `<Vaso>` forwards `ref` to its root element.
 

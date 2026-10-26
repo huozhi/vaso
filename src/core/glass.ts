@@ -50,9 +50,9 @@ export type GlassOptions = {
   /** Where the light comes from: an angle in degrees (0 above, 90 right) or 'pointer' to follow the cursor.
    * Default top left */
   light?: Light
-  /** Swell under a press, with a small lens forming under the finger */
+  /** Swell under a press, with a small lens forming under the finger. Settles without overshoot when the visitor prefers reduced motion */
   pressable?: boolean
-  /** Send a ripple through the glass from every tap */
+  /** Send a ripple through the glass from every tap. Off when the visitor prefers reduced motion */
   ripple?: boolean
 }
 
@@ -108,6 +108,13 @@ function settle(options: GlassOptions): Settings {
     pressable: options.pressable ?? false,
     ripple: options.ripple ?? false,
   }
+}
+
+let reducedMotionQuery: MediaQueryList | null | undefined
+/** Whether the visitor asked for reduced motion. Read on every press, so changing the setting applies at once */
+function prefersReducedMotion() {
+  reducedMotionQuery ??= typeof matchMedia === 'undefined' ? null : matchMedia('(prefers-reduced-motion: reduce)')
+  return !!reducedMotionQuery?.matches
 }
 
 /** The glass's look before it has measured itself: frosted, with its rim. Framework bindings can render this on the
@@ -174,7 +181,8 @@ export function createGlass(root: HTMLElement, options: GlassOptions = {}): Glas
   let destroyed = false
 
   // Press and ripples: while either is moving, the map is redrawn every frame with them in it
-  const press = { value: 0, velocity: 0, target: 0, at: { x: 0, y: 0 } }
+  // `calm`: the visitor asked for reduced motion, so the swell settles without overshooting
+  const press = { value: 0, velocity: 0, target: 0, at: { x: 0, y: 0 }, calm: false }
   let ripples: { x: number; y: number; t0: number }[] = []
   let liveHref: string | null = null
   // The copy's CSS filter: the SVG filter, then the frost
@@ -337,8 +345,9 @@ export function createGlass(root: HTMLElement, options: GlassOptions = {}): Glas
     const t = now / 1000
     const dt = Math.min(0.05, t - (liveLast || t))
     liveLast = t
-    // A slightly underdamped spring, so the glass overshoots a little as it swells and settles
-    press.velocity += ((press.target - press.value) * 300 - press.velocity * 20) * dt
+    // A slightly underdamped spring, so the glass overshoots a little as it swells and settles. With reduced motion
+    // it's critically damped (2√300): the glass still answers the press, but doesn't wobble
+    press.velocity += ((press.target - press.value) * 300 - press.velocity * (press.calm ? 34.6 : 20)) * dt
     press.value += press.velocity * dt
     ripples = ripples.filter((r) => t - r.t0 < RIPPLE_LIFE)
     const settled = Math.abs(press.value) < 0.002 && Math.abs(press.velocity) < 0.01 && press.target === 0
@@ -393,12 +402,15 @@ export function createGlass(root: HTMLElement, options: GlassOptions = {}): Glas
   const onDown = (event: PointerEvent) => {
     if (!settings.pressable && !settings.ripple) return
     const at = toGlass(event)
+    // With reduced motion, a press still swells the glass (calmly), but no ripple runs through it
+    const reduced = prefersReducedMotion()
     if (settings.pressable) {
       press.target = 1
       press.at = at
+      press.calm = reduced
     }
-    if (settings.ripple) ripples.push({ ...at, t0: performance.now() / 1000 })
-    animate()
+    if (settings.ripple && !reduced) ripples.push({ ...at, t0: performance.now() / 1000 })
+    if (settings.pressable || ripples.length) animate()
   }
   const onMove = (event: PointerEvent) => {
     if (press.target) press.at = toGlass(event)
