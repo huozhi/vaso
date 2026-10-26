@@ -8,8 +8,14 @@ export const GLASS_ROOT_ATTRIBUTE = 'data-vaso-root'
 /** Marks a glass's layer (the element carrying the filter), which clones leave out */
 export const GLASS_LAYER_ATTRIBUTE = 'data-vaso'
 
-// Cloning a large subtree on every change costs more than the effect is worth; those glasses stay frosted
+// Cloning a large subtree on every change costs more than the effect is worth; those glasses stay frosted.
+// Only elements behind the glass count: the rest of the source is copied as empty boxes
 const MAX_SOURCE_ELEMENTS = 400
+// Finding what's behind the glass reads every element's rect, so sources larger than this aren't scanned
+const MAX_SCANNED_ELEMENTS = 5000
+// How far around the glass its copy reaches, as a multiple of the glass's longer side. Glass that moves past it
+// (a dragged lens) is cloned again around its new place
+const REGION_MARGIN = 1
 // Minimum time between re-clones while the source keeps changing (transitions, typing, ...)
 const RECLONE_INTERVAL = 100
 // Video mirrors are drawn at device resolution, capped to keep large glasses cheap
@@ -68,6 +74,69 @@ function backgroundBehind(element: HTMLElement) {
   return 'white'
 }
 
+/** An area relative to a source element's border box */
+type Region = { left: number; top: number; right: number; bottom: number }
+
+// The area a copy covers: the glass, and as far around it as the glass may move before it's cloned again
+function regionAround(glass: Glass, sourceRect: DOMRect): Region {
+  const rect = glass.container.getBoundingClientRect()
+  const margin = Math.max(rect.width, rect.height) * REGION_MARGIN
+  return {
+    left: rect.left - sourceRect.left - margin,
+    top: rect.top - sourceRect.top - margin,
+    right: rect.right - sourceRect.left + margin,
+    bottom: rect.bottom - sourceRect.top + margin,
+  }
+}
+
+const intersects = (a: DOMRect, b: DOMRect) => a.right > b.left && a.left < b.right && a.bottom > b.top && a.top < b.bottom
+
+const overlaps = (rect: DOMRect, region: Region, sourceRect: DOMRect) =>
+  rect.right - sourceRect.left > region.left &&
+  rect.left - sourceRect.left < region.right &&
+  rect.bottom - sourceRect.top > region.top &&
+  rect.top - sourceRect.top < region.bottom
+
+const contains = (rect: DOMRect, region: Region, sourceRect: DOMRect) =>
+  rect.left - sourceRect.left >= region.left &&
+  rect.right - sourceRect.left <= region.right &&
+  rect.top - sourceRect.top >= region.top &&
+  rect.bottom - sourceRect.top <= region.bottom
+
+// Replaced elements would load (or play) again if cloned, so their placeholders are plain boxes
+const REPLACED = /^(IMG|VIDEO|AUDIO|IFRAME|OBJECT|EMBED|PICTURE|CANVAS)$/
+
+// Stands in for a subtree that isn't behind the glass: an empty, invisible box of the same size, so the
+// content that is behind the glass keeps its place
+function placeholderFor(element: Element) {
+  if (!(element instanceof HTMLElement)) return element.cloneNode(false) as Element
+  const style = getComputedStyle(element)
+  const replaced = REPLACED.test(element.tagName)
+  const placeholder = replaced ? document.createElement('span') : (element.cloneNode(false) as HTMLElement)
+  if (replaced) {
+    for (const name of ['class', 'style']) {
+      const value = element.getAttribute(name)
+      if (value !== null) placeholder.setAttribute(name, value)
+    }
+  }
+  Object.assign(placeholder.style, {
+    display: style.display === 'inline' ? 'inline-block' : style.display,
+    boxSizing: 'border-box',
+    width: `${element.offsetWidth}px`,
+    height: `${element.offsetHeight}px`,
+    minWidth: '0',
+    minHeight: '0',
+    maxWidth: 'none',
+    maxHeight: 'none',
+    flex: 'none',
+    visibility: 'hidden',
+  })
+  placeholder.removeAttribute('id')
+  // Not a glass anymore, so empty glass cleanup keeps it
+  placeholder.removeAttribute(GLASS_ROOT_ATTRIBUTE)
+  return placeholder
+}
+
 const zIndexOf = (style: CSSStyleDeclaration) => (style.zIndex === 'auto' ? 0 : parseInt(style.zIndex, 10) || 0)
 
 function hasVisibleContent(element: Element, style: CSSStyleDeclaration) {
@@ -79,22 +148,64 @@ function hasVisibleContent(element: Element, style: CSSStyleDeclaration) {
   return false
 }
 
-// Clone `source` without glass layers and without what paints above this glass. Returns null when there
-// is nothing left worth refracting, or the source is too large to clone
-function cloneBackdrop(source: HTMLElement, glass: Glass) {
-  const sourceElements = [source, ...source.querySelectorAll<HTMLElement>('*')]
-  if (sourceElements.length > MAX_SOURCE_ELEMENTS) return null
+const TOO_LARGE = 'too-large'
 
-  const root = source.cloneNode(true) as HTMLElement
-  const cloneElements = [root, ...root.querySelectorAll<HTMLElement>('*')]
+// Clone `source` without glass layers and without what paints above this glass. Only what lies around the
+// glass is copied; the rest of the source becomes placeholders. Returns null when there is nothing left
+// worth refracting, or TOO_LARGE when even that is too much to clone
+function cloneBackdrop(source: HTMLElement, glass: Glass) {
+  const all = [source, ...source.querySelectorAll('*')]
+  if (all.length > MAX_SCANNED_ELEMENTS) return TOO_LARGE
+
+  // What overlaps the region, and its ancestors. Descendants can overflow their parents, so check every one
+  const sourceRect = source.getBoundingClientRect()
+  const region = regionAround(glass, sourceRect)
+  const kept = new Set<Element>([source])
+  for (const element of all) {
+    if (kept.has(element) || !overlaps(element.getBoundingClientRect(), region, sourceRect)) continue
+    for (let node: Element | null = element; node && !kept.has(node); node = node.parentElement) kept.add(node)
+  }
+
+  // Build the clone from kept elements only. Glass internals and this glass are left out entirely, and inline
+  // elements are copied whole, since an empty inline box would reflow the line it's on
+  const clones = new Map<Element, Element>()
+  let pruned = false
+  const build = (element: Element, whole: boolean) => {
+    const clone = element.cloneNode(false) as Element
+    clones.set(element, clone)
+    if (clones.size > MAX_SOURCE_ELEMENTS) return clone
+    for (const child of element.childNodes) {
+      if (!(child instanceof Element)) {
+        clone.appendChild(child.cloneNode(false))
+      } else if (child === glass.wrapper || isGlassInternal(child)) {
+        continue
+      } else if (whole || kept.has(child)) {
+        clone.appendChild(build(child, whole))
+      } else if (child instanceof HTMLElement && getComputedStyle(child).display === 'inline') {
+        clone.appendChild(build(child, true))
+      } else if (child instanceof HTMLElement && /^(absolute|fixed)$/.test(getComputedStyle(child).position)) {
+        // Out of flow, so leaving it out moves nothing that is behind the glass
+        pruned = true
+      } else {
+        clone.appendChild(placeholderFor(child))
+        pruned = true
+      }
+    }
+    return clone
+  }
+  const root = build(source, false) as HTMLElement
+  if (clones.size > MAX_SOURCE_ELEMENTS) return TOO_LARGE
+
   const glassZ = zIndexOf(getComputedStyle(glass.wrapper))
   const removed = new Set<Element>()
   const media: MediaPair[] = []
   const loading: Array<() => Promise<unknown>> = []
   let hasContent = false
 
-  sourceElements.forEach((element, i) => {
-    const clone = cloneElements[i]
+  clones.forEach((cloneElement, sourceElement) => {
+    // SVG content goes through here too; it only needs what HTMLElement and SVGElement share
+    const element = sourceElement as HTMLElement
+    const clone = cloneElement as HTMLElement
     if (element.parentElement && removed.has(element.parentElement)) {
       removed.add(element)
       return
@@ -162,17 +273,23 @@ function cloneBackdrop(source: HTMLElement, glass: Glass) {
       Promise.allSettled(loading.map((load) => load())),
       new Promise((resolve) => setTimeout(resolve, MAX_READY_WAIT)),
     ])
-  return { source, root, media, ready }
+  // A pruned copy only covers its region, so it has to be cloned again once the glass leaves it
+  return { source, root, media, ready, kept, region: pruned ? region : undefined }
 }
 
 // Make a clone a static picture, placed with left/top by the copy. Drop the original's own offsets,
 // transforms and animations, since its measured rect already includes them. Keep left/top positioning:
-// WebKit grows filter bounding boxes by child transforms
+// WebKit grows filter bounding boxes by child transforms. The copy sizes it to the measured size, so drop
+// size limits too: percentages in them (`max-width: 100%`) would resolve against the glass, not the source's parent
 function detachClone(root: HTMLElement) {
   Object.assign(root.style, {
     position: 'absolute',
     margin: '0',
     inset: 'auto',
+    minWidth: '0',
+    minHeight: '0',
+    maxWidth: 'none',
+    maxHeight: 'none',
     transform: 'none',
     translate: 'none',
     rotate: 'none',
@@ -215,7 +332,12 @@ function cloneOwnContent(glass: Glass) {
     clone.removeAttribute('id')
   })
   root.removeAttribute(GLASS_ROOT_ATTRIBUTE)
-  if (!root.childElementCount && !root.textContent!.trim()) return null
+  // The glass element's own background and border paint under the glass layer too, so they're refracted
+  // even when it has no content (a tinted pane)
+  const style = getComputedStyle(glass.wrapper)
+  const paints =
+    isPainted(style) || ['Top', 'Right', 'Bottom', 'Left'].some((side) => parseFloat(style.getPropertyValue(`border-${side.toLowerCase()}-width`)) > 0)
+  if (!paints && !root.childElementCount && !root.textContent!.trim()) return null
   detachClone(root)
   return root
 }
@@ -228,22 +350,28 @@ function applySourceStyles(root: HTMLElement, source: HTMLElement) {
   }
 }
 
+const isPainted = (style: CSSStyleDeclaration) => !isTransparent(style.backgroundColor) || style.backgroundImage !== 'none'
+
 function findBackdrop(glass: Glass) {
   // A transparent ancestor may contain only another glass's icons. Stopping there
   // loses an image or video immediately behind that ancestor and fills the copy
-  // with the page color instead. Prefer the nearest ancestor with its own painted
-  // background or media; retain the first usable copy for text-only backdrops.
-  let nearest: ReturnType<typeof cloneBackdrop> = null
+  // with the page color instead. Prefer the nearest ancestor that paints behind the
+  // glass itself or through a child (media, or a decoration like a glow); retain the
+  // first usable copy for text-only backdrops.
+  let nearest: Clone | null = null
+  const glassRect = glass.container.getBoundingClientRect()
+  const paintsBehind = (child: Element) =>
+    child !== glass.wrapper &&
+    !isGlassInternal(child) &&
+    (/^(IMG|VIDEO|CANVAS|PICTURE)$/i.test(child.tagName) || isPainted(getComputedStyle(child))) &&
+    intersects(child.getBoundingClientRect(), glassRect)
   for (let node = glass.wrapper.parentElement; node && node !== document.documentElement; node = node.parentElement) {
     const copy = cloneBackdrop(node, glass)
+    if (copy === TOO_LARGE) return nearest
     if (copy) {
       nearest ??= copy
-      const style = getComputedStyle(node)
-      const painted = !isTransparent(style.backgroundColor) || style.backgroundImage !== 'none'
-      const media = [...node.children].some((child) => /^(IMG|VIDEO|CANVAS|PICTURE)$/i.test(child.tagName))
-      if (painted || media) return copy
+      if (isPainted(getComputedStyle(node)) || [...node.children].some(paintsBehind)) return copy
     }
-    if (node.querySelectorAll('*').length > MAX_SOURCE_ELEMENTS) return nearest
   }
   return nearest
 }
@@ -331,7 +459,7 @@ function visualScale(element: HTMLElement, rect: DOMRect) {
   return transformed && scale > 0 ? scale : boxScale
 }
 
-type Clone = NonNullable<ReturnType<typeof cloneBackdrop>> & { applied?: string }
+type Clone = Exclude<ReturnType<typeof cloneBackdrop>, null | typeof TOO_LARGE> & { applied?: string }
 
 function createBackdropCopy(glass: Glass) {
   // The visible clone, and a newer one waiting for its images and videos before replacing it
@@ -356,6 +484,14 @@ function createBackdropCopy(glass: Glass) {
   })
   ownObserver.observe(glass.wrapper, { subtree: true, childList: true, attributes: true, characterData: true })
 
+  // A pruned copy doesn't depend on elements it left out that are still away from the glass, such as
+  // animations elsewhere on the page. Anything that moves into the region is checked by its new rect
+  const outsideCopy = (target: Node) => {
+    const element = target instanceof Element ? target : target.parentElement
+    if (!active?.region || !element || active.kept.has(element)) return false
+    return !overlaps(element.getBoundingClientRect(), active.region, active.source.getBoundingClientRect())
+  }
+
   const observe = (source: HTMLElement) => {
     observer?.disconnect()
     observer = new MutationObserver((records) => {
@@ -364,6 +500,7 @@ function createBackdropCopy(glass: Glass) {
         // and attribute changes on ancestors that only move this glass
         if (isGlassInternal(record.target) || glass.wrapper.contains(record.target)) continue
         if (record.type === 'attributes' && record.target.contains(glass.wrapper)) continue
+        if (outsideCopy(record.target)) continue
         domChanged = true
         return
       }
@@ -384,6 +521,7 @@ function createBackdropCopy(glass: Glass) {
     observer?.disconnect()
     observer = null
     ownObserver.disconnect()
+    moveObserver.disconnect()
     visibilityObserver?.disconnect()
     active?.root.remove()
     pending?.root.remove()
@@ -453,6 +591,53 @@ function createBackdropCopy(glass: Glass) {
     if (own) glass.layer.appendChild(own)
   }
 
+  // Lines the copies up with the glass and rounds the filtered output
+  const place = () => {
+    if (!active) return
+    const containerRect = glass.container.getBoundingClientRect()
+    const width = glass.container.offsetWidth
+    const height = glass.container.offsetHeight
+    const scale = visualScale(glass.container, containerRect)
+
+    // Round the filtered output itself (clip-path applies after filter). Safari stops clipping a child to
+    // its parent's rounded overflow once the child is composited (e.g. while dragging), which showed the
+    // copy's square corners. Read the radius live, since it may come from CSS
+    const radius = Math.min(parseFloat(getComputedStyle(glass.container).borderTopLeftRadius) || 0, width / 2, height / 2)
+    const clipPath = `inset(0 round ${radius}px)`
+    if (clipPath !== appliedClipPath) glass.layer.style.clipPath = appliedClipPath = clipPath
+
+    // Glass that moved past what its pruned copy covers needs a copy around its new place
+    if (active.region && !contains(containerRect, active.region, active.source.getBoundingClientRect())) domChanged = true
+
+    align(active, containerRect, scale)
+    if (own) {
+      const wrapperRect = glass.wrapper.getBoundingClientRect()
+      const x = (wrapperRect.left - containerRect.left) / scale
+      const y = (wrapperRect.top - containerRect.top) / scale
+      const next = `${x},${y},${glass.wrapper.offsetWidth},${glass.wrapper.offsetHeight}`
+      if (next !== ownApplied) {
+        ownApplied = next
+        Object.assign(own.style, {
+          left: `${x}px`,
+          top: `${y}px`,
+          width: `${glass.wrapper.offsetWidth}px`,
+          height: `${glass.wrapper.offsetHeight}px`,
+        })
+      }
+    }
+    if (pending) align(pending, containerRect, scale)
+  }
+
+  // Scripts often move glass after the shared frame callback has already aligned it (React commits pointer
+  // moves in a later task, physics run their own frame loops), so the browser would paint one frame with the
+  // copy where the glass used to be. Mutation callbacks run before that paint, so align again from there
+  const moveObserver = new MutationObserver(() => {
+    if (glass.container.isConnected && visible) place()
+  })
+  for (let node: HTMLElement | null = glass.wrapper; node && node !== document.body; node = node.parentElement) {
+    moveObserver.observe(node, { attributes: true, attributeFilter: ['style', 'class'] })
+  }
+
   const update = (now: number) => {
     if (!glass.container.isConnected || !visible) return
     if ((domChanged || stylesChanged) && now - lastBuild >= RECLONE_INTERVAL) build(now)
@@ -471,39 +656,9 @@ function createBackdropCopy(glass: Glass) {
       applySourceStyles(active.root, active.source)
     }
 
-    const containerRect = glass.container.getBoundingClientRect()
-    const width = glass.container.offsetWidth
-    const height = glass.container.offsetHeight
-    const scale = visualScale(glass.container, containerRect)
-
-    // Round the filtered output itself (clip-path applies after filter). Safari stops clipping a child to
-    // its parent's rounded overflow once the child is composited (e.g. while dragging), which showed the
-    // copy's square corners. Read the radius live, since it may come from CSS
-    const radius = Math.min(parseFloat(getComputedStyle(glass.container).borderTopLeftRadius) || 0, width / 2, height / 2)
-    const clipPath = `inset(0 round ${radius}px)`
-    if (clipPath !== appliedClipPath) glass.layer.style.clipPath = appliedClipPath = clipPath
-
-    align(active, containerRect, scale)
-    if (own) {
-      const wrapperRect = glass.wrapper.getBoundingClientRect()
-      const x = (wrapperRect.left - containerRect.left) / scale
-      const y = (wrapperRect.top - containerRect.top) / scale
-      const next = `${x},${y},${glass.wrapper.offsetWidth},${glass.wrapper.offsetHeight}`
-      if (next !== ownApplied) {
-        ownApplied = next
-        Object.assign(own.style, {
-          left: `${x}px`,
-          top: `${y}px`,
-          width: `${glass.wrapper.offsetWidth}px`,
-          height: `${glass.wrapper.offsetHeight}px`,
-        })
-      }
-    }
+    place()
     syncMedia(active.media)
-    if (pending) {
-      align(pending, containerRect, scale)
-      syncMedia(pending.media)
-    }
+    if (pending) syncMedia(pending.media)
   }
 
   // Style changes can reveal backgrounds (or hide them) without touching the DOM, so re-pick the source

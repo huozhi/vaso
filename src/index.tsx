@@ -120,6 +120,9 @@ function usesBoundingBoxUnits() {
     /AppleWebKit\//.test(navigator.userAgent) && !/Chrome\/|Chromium\/|Edg\/|Firefox\//.test(navigator.userAgent)
   return webKitFilterUnits
 }
+// WebKit's Gaussian blur has a minimum kernel, so any blur below about half a pixel renders like ~0.6px and
+// softens everything behind the glass. Chromium keeps blurs that small nearly invisible, so WebKit skips them
+const WEBKIT_MIN_BLUR = 0.4
 const subscribeNoop = () => () => {}
 const getServerSupport = () => false
 
@@ -263,6 +266,9 @@ const MAX_SPECTRUM_SAMPLES = 9
 const MAX_COPY_SPECTRUM_SAMPLES = 3
 // Maximum pixels between two neighboring samples before the bands show as separate ghosts
 const SPECTRUM_STEP = 1.25
+// The widest gap between the copy's bands. Wider than SPECTRUM_STEP, since a softer spectrum still reads as
+// dispersion, but narrow enough that the bands don't come apart
+const MAX_COPY_SPECTRUM_STEP = 2.5
 // Glass whose shorter side is below this many pixels renders at most SMALL_GLASS_SPECTRUM_SAMPLES bands
 const SMALL_GLASS_SIZE = 80
 const SMALL_GLASS_SPECTRUM_SAMPLES = 5
@@ -426,19 +432,23 @@ const Vaso: React.FC<VasoProps> = ({
   const scale = 2 * depth * bezel * REFRACTION * unit
   // Total separation in pixels between the red and violet images at the rim
   // Flat glass doesn't refract, so fade dispersion out as depth approaches zero
-  const spreadPx = dispersion ? Math.max(dispersion, 0) * bezel * DISPERSION * Math.min(1, Math.abs(depth) * 4) : 0
-  const spread = spreadPx * unit
   // Small glass has a narrow rim, where extra bands are indistinguishable; each band is a full displacement pass
   const sizeSamples = geometry && Math.min(geometry.width, geometry.height) < SMALL_GLASS_SIZE ? SMALL_GLASS_SPECTRUM_SAMPLES : Infinity
   const maxSamples = Math.min(copyMode ? MAX_COPY_SPECTRUM_SAMPLES : MAX_SPECTRUM_SAMPLES, sizeSamples)
+  const fullSpreadPx = dispersion ? Math.max(dispersion, 0) * bezel * DISPERSION * Math.min(1, Math.abs(depth) * 4) : 0
+  // The copy's few bands can't cover a wide spread without splitting into colored ghosts of every edge, so
+  // narrow it there to what they blend smoothly
+  const spreadPx = copyMode ? Math.min(fullSpreadPx, (maxSamples - 1) * MAX_COPY_SPECTRUM_STEP) : fullSpreadPx
+  const spread = spreadPx * unit
   const spectrum =
     spreadPx > 0.5 ? getSpectrum(Math.min(maxSamples, Math.max(3, Math.ceil(spreadPx / SPECTRUM_STEP) + 1))) : null
 
+  const visibleBlur = copyMode && usesBoundingBoxUnits() && blur < WEBKIT_MIN_BLUR ? 0 : blur
   // Avoid brightness/contrast boosts here: they clip light backdrops to flat white
-  const refractionFilter = `url(#${filterId}) blur(${blur}px) saturate(1.2)`
+  const refractionFilter = `url(#${filterId}) blur(${visibleBlur}px) saturate(1.2)`
   // Without backdrop refraction (Safari, Firefox), keep the same blur as Chromium. The backdrop copy
   // covers what it can; the specular rim and shadow still outline the glass elsewhere
-  const backdropFilter = useSvgFilter ? refractionFilter : `blur(${blur}px) saturate(1.2)`
+  const backdropFilter = useSvgFilter ? refractionFilter : `blur(${visibleBlur}px) saturate(1.2)`
 
   return (
     <WrapComponent
@@ -481,9 +491,10 @@ const Vaso: React.FC<VasoProps> = ({
               left: 0,
               width: geometry.width,
               height: geometry.height,
-              // Clip the copy so the element's bounding box, used by objectBoundingBox filters, is the glass
+              // Clip the copy so the element's bounding box, used by objectBoundingBox filters, is the glass.
+              // Not rounded: refraction samples next to the rim, where a rounded edge is transparent and leaves a
+              // colored fringe in the bands that bend least. clip-path rounds the filtered output instead
               overflow: 'hidden',
-              borderRadius: 'inherit',
               // Safari can paint filtered pixels outside clip-path and rounded overflow.
               WebkitMaskImage: '-webkit-radial-gradient(white, black)',
               filter: refractionFilter,
