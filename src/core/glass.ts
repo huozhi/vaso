@@ -185,6 +185,11 @@ export function createGlass(root: HTMLElement, options: GlassOptions = {}): Glas
   const press = { value: 0, velocity: 0, target: 0, at: { x: 0, y: 0 } }
   let ripples: { x: number; y: number; t0: number }[] = []
   let liveHref: string | null = null
+  // The map the copy's filter was last repainted for (WebKit), and the hair the saturation alternates by
+  let nudgedHref = ''
+  let nudge = false
+  let copyFrost = ''
+  const copyFilter = () => `url(#${id}) ${nudge ? copyFrost.replace('saturate(1.2)', 'saturate(1.2001)') : copyFrost}`
   let liveFrame = 0
   let liveLast = 0
 
@@ -299,7 +304,23 @@ export function createGlass(root: HTMLElement, options: GlassOptions = {}): Glas
       // refraction samples next to the rim, where a rounded edge is transparent and leaves a colored fringe in
       // the bands that bend least. clip-path rounds the filtered output instead
       layerStyle.overflow = framed ? 'visible' : 'hidden'
-      layerStyle.filter = `url(#${id}) ${frost}`
+      // WebKit doesn't repaint an element when only the SVG filter it uses changes, and loads a new map later
+      // still, so a press or ripple froze on its first frame until a layout. An equivalent but different CSS
+      // filter makes it rebuild: once when the map changes, and once the new map has loaded
+      const href = liveHref ?? geometry.href
+      if (framed && href !== nudgedHref) {
+        nudgedHref = href
+        nudge = !nudge
+        const image = new Image()
+        image.onload = () => {
+          if (destroyed || nudgedHref !== href || !copyLayer) return
+          nudge = !nudge
+          copyLayer.style.filter = copyFilter()
+        }
+        image.src = href
+      }
+      copyFrost = frost
+      layerStyle.filter = copyFilter()
     }
 
     if ((useSvgFilter || useCopyFilter) && geometry) {

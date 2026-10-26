@@ -39,6 +39,10 @@ const MAX_READY_WAIT = 1000
 // Visibility is reported a frame late, so glass this close to the viewport keeps updating and is already
 // aligned when it scrolls into view
 const VISIBILITY_MARGIN = '100px'
+// How often a resting copy checks the styles it copied (theme changes), and for how long after a transition starts
+// it checks every frame instead, in ms
+const SIGNATURE_INTERVAL = 250
+const TRANSITION_WINDOW = 1000
 
 // How far a glass may overhang an ancestor that still counts as its backdrop, in px
 const COVER_TOLERANCE = 2
@@ -392,32 +396,39 @@ function findBackdrop(glass: Glass): Clone | null {
   // A transparent ancestor may contain only another glass's icons. Stopping there
   // loses an image or video immediately behind that ancestor and fills the copy
   // with the page color instead. Prefer the nearest ancestor that paints behind the
-  // glass itself or through a child (media, or a decoration like a glow); retain the
-  // first usable copy for text-only backdrops.
-  let nearest: Clone | null = null
+  // glass itself or through a child (media, or a decoration like a glow); fall back
+  // to the first ancestor with any content for text-only backdrops.
   const glassRect = glass.container.getBoundingClientRect()
   const paintsBehind = (child: Element) =>
     child !== glass.wrapper &&
     !isGlassInternal(child) &&
     (/^(IMG|VIDEO|CANVAS|PICTURE)$/i.test(child.tagName) || isPainted(getComputedStyle(child))) &&
     intersects(child.getBoundingClientRect(), glassRect)
+  // Cloning scans every element of an ancestor, so only ancestors that could be the backdrop are cloned on the way
+  // up; the ones passed over are cloned afterwards, nearest first, only if none could
+  const passed: HTMLElement[] = []
   for (let node = glass.wrapper.parentElement; node && node !== document.documentElement; node = node.parentElement) {
-    const copy = cloneBackdrop(node, glass)
-    if (copy === TOO_LARGE) return nearest
-    if (copy) {
-      nearest ??= copy
-      // An ancestor smaller than the glass (a switch track under its bigger knob) leaves the overhang showing the
-      // fill color instead of what's really there, so keep looking for one that covers the glass
-      const rect = node.getBoundingClientRect()
-      const covers =
-        rect.left <= glassRect.left + COVER_TOLERANCE &&
-        rect.top <= glassRect.top + COVER_TOLERANCE &&
-        rect.right >= glassRect.right - COVER_TOLERANCE &&
-        rect.bottom >= glassRect.bottom - COVER_TOLERANCE
-      if (covers && (isPainted(getComputedStyle(node)) || [...node.children].some(paintsBehind))) return copy
+    // An ancestor smaller than the glass (a switch track under its bigger knob) leaves the overhang showing the
+    // fill color instead of what's really there, so it has to cover the glass
+    const rect = node.getBoundingClientRect()
+    const covers =
+      rect.left <= glassRect.left + COVER_TOLERANCE &&
+      rect.top <= glassRect.top + COVER_TOLERANCE &&
+      rect.right >= glassRect.right - COVER_TOLERANCE &&
+      rect.bottom >= glassRect.bottom - COVER_TOLERANCE
+    if (covers && (isPainted(getComputedStyle(node)) || [...node.children].some(paintsBehind))) {
+      const copy = cloneBackdrop(node, glass)
+      if (copy === TOO_LARGE) break
+      if (copy) return copy
     }
+    passed.push(node)
   }
-  return nearest
+  for (const node of passed) {
+    const copy = cloneBackdrop(node, glass)
+    if (copy === TOO_LARGE) return null
+    if (copy) return copy
+  }
+  return null
 }
 
 // Where a video's frame lands in its box, following object-fit and object-position
@@ -540,6 +551,10 @@ function createBackdropCopy(glass: Glass) {
   let lastBuild = -Infinity
   let signature = ''
   let appliedClipPath = ''
+  // What the copy was last aligned to, and whether it has to be aligned again regardless
+  let placedKey = ''
+  let placeDirty = true
+  let lastSignatureCheck = -Infinity
   // Copy of the glass's own content, painted above the backdrop copy
   let own: HTMLElement | null = null
   let ownApplied = ''
@@ -605,7 +620,13 @@ function createBackdropCopy(glass: Glass) {
   const visibilityObserver =
     typeof IntersectionObserver === 'undefined'
       ? null
-      : new IntersectionObserver(([entry]) => (visible = entry.isIntersecting), { rootMargin: VISIBILITY_MARGIN })
+      : new IntersectionObserver(
+          ([entry]) => {
+            visible = entry.isIntersecting
+            placeDirty = true
+          },
+          { rootMargin: VISIBILITY_MARGIN },
+        )
   visibilityObserver?.observe(glass.container)
 
   const dispose = () => {
@@ -623,6 +644,7 @@ function createBackdropCopy(glass: Glass) {
   }
 
   const build = (now: number) => {
+    placeDirty = true
     const rebuild = domChanged
     domChanged = stylesChanged = false
     lastBuild = now
@@ -650,6 +672,7 @@ function createBackdropCopy(glass: Glass) {
     found.ready().then(() => {
       // Loaded images and videos can change its layout
       found.extent = undefined
+      placeDirty = true
       if (pending !== found) return
       active?.root.remove()
       active = found
@@ -682,6 +705,7 @@ function createBackdropCopy(glass: Glass) {
 
   const buildOwn = (now: number) => {
     ownChanged = false
+    placeDirty = true
     lastOwnBuild = now
     own?.remove()
     own = cloneOwnContent(glass)
@@ -801,18 +825,33 @@ function createBackdropCopy(glass: Glass) {
     if (!active) return
 
     // Theme or inherited style changes don't mutate the source subtree, so watch the values the clone
-    // copied. The clone shares the page's stylesheets, so refreshing those values is all it needs; this
-    // runs every frame of a color transition, so it must stay cheap
-    const sourceStyle = getComputedStyle(active.source)
-    const background = backgroundBehind(active.source)
-    const nextSignature = `${sourceStyle.color}|${sourceStyle.fontSize}|${background}`
-    if (nextSignature !== signature) {
-      signature = nextSignature
-      glass.layer.style.backgroundColor = background
-      applySourceStyles(active.root, active.source)
+    // copied. The clone shares the page's stylesheets, so refreshing those values is all it needs. Reading
+    // them walks the ancestors' computed styles, so it runs every frame only while a transition may be
+    // changing them, and a few times a second otherwise
+    const transitioning = now - lastTransition < TRANSITION_WINDOW && !!lastTransitionTarget?.contains(active.source)
+    if (placeDirty || transitioning || now - lastSignatureCheck >= SIGNATURE_INTERVAL) {
+      lastSignatureCheck = now
+      const sourceStyle = getComputedStyle(active.source)
+      const background = backgroundBehind(active.source)
+      const nextSignature = `${sourceStyle.color}|${sourceStyle.fontSize}|${background}`
+      if (nextSignature !== signature) {
+        signature = nextSignature
+        glass.layer.style.backgroundColor = background
+        applySourceStyles(active.root, active.source)
+      }
     }
 
-    place()
+    // Most frames nothing has moved, which the two rects tell; aligning reads styles and walks ancestors, so
+    // it only runs when one of them changed or the copy did. Restyles of the glass's ancestors align at once
+    // through moveObserver, and a group that changes its filter calls refresh()
+    const c = glass.container.getBoundingClientRect()
+    const r = active.source.getBoundingClientRect()
+    const key = `${c.left},${c.top},${c.width},${c.height},${r.left},${r.top},${r.width},${r.height}`
+    if (placeDirty || key !== placedKey) {
+      placeDirty = false
+      placedKey = key
+      place()
+    }
     syncMedia(active.media)
     if (pending) syncMedia(pending.media)
   }
@@ -844,8 +883,18 @@ const invalidateAll = () => copies.forEach((copy) => copy.invalidate())
 
 // Stylesheets that arrive late (lazy CSS, runtime CSS-in-JS, dev servers) change which ancestors paint
 // something, so every copy re-picks its source when <head> changes and once the page has loaded
+// When a CSS transition last started anywhere on the page: copies follow the styles they copied closely meanwhile
+// Only transitions on the source or above it can change what a copy inherits (a theme switch), so the element counts
+let lastTransition = -Infinity
+let lastTransitionTarget: Element | null = null
+const onTransition = (event: Event) => {
+  lastTransition = performance.now()
+  lastTransitionTarget = event.target instanceof Element ? event.target : null
+}
+
 function watchStyles() {
   if (stylesObserver) return
+  document.addEventListener('transitionrun', onTransition, true)
   stylesObserver = new MutationObserver(invalidateAll)
   stylesObserver.observe(document.head, { childList: true, subtree: true, characterData: true })
   if (document.readyState !== 'complete') window.addEventListener('load', invalidateAll, { once: true })
@@ -867,6 +916,7 @@ export function attachBackdropCopy(glass: Glass) {
     if (!copies.size) {
       stylesObserver?.disconnect()
       stylesObserver = null
+      document.removeEventListener('transitionrun', onTransition, true)
     }
   }, { refresh: copy.refresh })
 }
