@@ -124,6 +124,16 @@ export function createGlassGroup(root: HTMLElement, options: GlassGroupOptions =
   const framed = copyMode && isWebKit()
   let copyLayer: HTMLElement | null = null
   let detachCopy: ReturnType<typeof attachBackdropCopy> | null = null
+  let copyBlur = 0
+  let nudge = false
+  const applyCopyFilter = () => {
+    // The saturation alternates by a hair: equivalent to the eye, but a new style for WebKit (see repaintCopy)
+    if (copyLayer) copyLayer.style.filter = `url(#${id}) blur(${copyBlur}px) saturate(${nudge ? 1.2001 : 1.2})`
+  }
+  const repaintCopy = () => {
+    nudge = !nudge
+    applyCopyFilter()
+  }
   // The part of the layer WebKit filters, in layer pixels, matching the cropped map
   let area = { x: 0, y: 0, width: 1, height: 1 }
 
@@ -289,8 +299,8 @@ export function createGlassGroup(root: HTMLElement, options: GlassGroupOptions =
     }
     filter.querySelector('feGaussianBlur')?.setAttribute('stdDeviation', String(blur))
     if (copyLayer) {
-      const visibleBlur = framed && blur < WEBKIT_MIN_BLUR ? 0 : blur
-      copyLayer.style.filter = `url(#${id}) blur(${visibleBlur}px) saturate(1.2)`
+      copyBlur = framed && blur < WEBKIT_MIN_BLUR ? 0 : blur
+      applyCopyFilter()
     }
     const maps = filter.querySelectorAll('feDisplacementMap')
     maps.forEach((map, i) => {
@@ -388,6 +398,17 @@ export function createGlassGroup(root: HTMLElement, options: GlassGroupOptions =
 
       const url = field.draw(bezel, crop)
       filter.querySelector('feImage')?.setAttribute('href', url)
+      if (framed) {
+        // WebKit doesn't repaint an element when only the SVG filter it uses changes, and loads the new map later
+        // still, so the glass kept its old shape until something else forced a repaint (a layout, a scroll). A
+        // different but equivalent CSS filter makes it rebuild the filter: once now, and once the map has loaded
+        repaintCopy()
+        const image = new Image()
+        image.onload = () => {
+          if (!destroyed && urls.includes(url)) repaintCopy()
+        }
+        image.src = url
+      }
       urls.push(url)
       // Keep the previous map until the new one has decoded
       while (urls.length > 3) URL.revokeObjectURL(urls.shift()!)
