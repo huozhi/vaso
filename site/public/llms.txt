@@ -49,9 +49,32 @@ All standard HTML attributes (className, style, onClick, ...) pass through to th
 | `blur` | number | `0.1` | 0–10 | Backdrop blur in px. High values read as frosted glass |
 | `dispersion` | number \| false | `0.5` | 0–3 | Rainbow split along the refracting edge. Fades out as depth → 0 |
 | `specular` | number \| false | `0.5` | 0–1 | Rim highlight intensity |
+| `light` | number \| `'pointer'` | top left | 0–360 | Where the light comes from: degrees (0 above, 90 right) or `'pointer'` to follow the cursor |
+| `pressable` | boolean | `false` | – | Swells under a press, with a small lens under the finger |
+| `ripple` | boolean | `false` | – | A ripple runs through the glass from every tap |
+
+`<Vaso>` forwards `ref` to its root element.
+
+## Merging glass: `<VasoGroup>`
+
+Every `<Vaso>` inside a `<VasoGroup>` becomes part of one glass; members that come close flow into each other.
+Move members with CSS transitions, transforms or any animation library: the group follows them every frame.
+
+```tsx
+import { Vaso, VasoGroup } from 'vaso'
+
+<VasoGroup smooth={32} depth={1.2} light="pointer">
+  <Vaso className="toolbar" style={{ position: 'absolute' }}>…</Vaso>
+  <Vaso className="search-button" style={{ position: 'absolute' }}>…</Vaso>
+</VasoGroup>
+```
+
+Group props: `smooth` (neck width in px, default 24), `depth` (default 1), `blur`, `dispersion`, `specular`, `light`,
+`overflow` (how far members may reach past the group's box, default 64). Members keep their own `outset` and `radius`.
+Groups work in every browser; Safari and Firefox refract a backdrop copy, as a single `<Vaso>` does.
 | `px` / `py` | number | – | – | Deprecated, use `outset={{ x, y }}` |
 
-Exports: `Vaso`, and the types `VasoProps`, `Outset`. From `vaso/core`: `createGlass`, `initialGlassStyle`, `resolveOutset`, `supportsBackdropRefraction`, and the types `Glass`, `GlassOptions`, `Outset`.
+Exports: `Vaso`, `VasoGroup`, and the types `VasoProps`, `VasoGroupProps`, `Outset`, `Light`. From `vaso/core`: `createGlass`, `createGlassGroup`, `initialGlassStyle`, `resolveOutset`, `supportsBackdropRefraction`, and the types `Glass`, `GlassOptions`, `GlassGroup`, `GlassGroupOptions`, `GroupMember`, `GroupMemberOptions`, `Outset`, `Light`.
 
 ## Recipes
 
@@ -75,6 +98,10 @@ Lens over an image (no children, explicit size, positioned over the content):
 Concave lens: `<Vaso width={60} height={60} radius={30} depth={-4} dispersion={1.5} />`
 
 Frosted panel: `<Vaso radius={20} depth={0.3} blur={6} specular={0.9}>…</Vaso>`
+
+Press and ripple: `<Vaso pressable ripple radius={44} depth={1.4} blur={1.2}>…</Vaso>`
+
+Pointer light: `<Vaso light="pointer" depth={1.2}>…</Vaso>`
 
 Good starting values: controls `depth 1–1.5, blur 0.3–1`; lenses `depth 2–3`; panels `depth 0.2–0.5, blur 4–8`.
 
@@ -107,3 +134,6 @@ Options match the props, minus `component` and `children`. `update` merges into 
 - Each dispersion band is a full displacement pass (up to 9 in Chromium). For large glass, or many glass elements at once, use `dispersion={false}` or a low value.
 - Large `blur` on large glass is the next biggest cost.
 - Prefer a few glass elements over dozens; each one is its own compositing layer.
+- Many glass pieces that sit together? Put them in one `<VasoGroup>`: it draws one glass for all of them, and only
+  redraws its map when a member actually moves or resizes.
+- Move glass with CSS transforms rather than changing its size: transforms don't redraw anything.

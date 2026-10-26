@@ -252,20 +252,53 @@
   display: block;
   filter: saturate(1.2);
 }
+/* Liquid search. Two glass pieces in one group trade places with a width transition; the group melts the
+   overlap into one shape. The springy curve makes the bar overshoot a little, like a drop settling */
+.lab-passthrough {
+  pointer-events: none;
+}
+.lab-bar-row {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  width: min(440px, calc(100% - 32px));
+  height: 56px;
+  transform: translateX(-50%);
+  pointer-events: auto;
+}
 .lab-toolbar,
 .lab-search {
-  position: absolute;
-  left: 0;
   top: 0;
   height: 56px;
-  display: flex;
-  align-items: center;
+  border-radius: 28px;
   color: #111827;
   font-size: 13px;
+  transition: width 520ms cubic-bezier(0.3, 1.25, 0.5, 1);
+}
+.lab-bar-content {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  overflow: hidden;
+  /* clip, not just hidden: focusing a clipped button must not scroll the bar's content sideways */
+  overflow: clip;
 }
 .lab-toolbar {
-  gap: 18px;
-  pointer-events: none;
+  left: 0;
+  width: calc(100% - 72px);
+}
+.lab-search {
+  right: 0;
+  width: 56px;
+}
+.lab-bar-row[data-open] .lab-toolbar {
+  width: 56px;
+}
+.lab-bar-row[data-open] .lab-search {
+  width: calc(100% - 68px);
 }
 .lab-back,
 .lab-search-icon {
@@ -281,7 +314,6 @@
   font: inherit;
   font-size: 22px;
   cursor: pointer;
-  pointer-events: auto;
 }
 .lab-url {
   flex: 1;
@@ -292,13 +324,13 @@
   font: inherit;
   color: inherit;
   text-align: left;
-  opacity: calc(0.75 * (1 - var(--open, 0) * 2));
   white-space: nowrap;
   cursor: text;
-  pointer-events: auto;
+  opacity: 0.75;
+  transition: opacity 200ms ease;
 }
-.lab-search {
-  overflow: hidden;
+.lab-bar-row[data-open] .lab-url {
+  opacity: 0;
 }
 .lab-search input {
   flex: 1;
@@ -309,8 +341,11 @@
   font: inherit;
   font-size: 15px;
   color: #111827;
-  opacity: calc(var(--open, 0) * 2 - 1);
-  pointer-events: auto;
+  opacity: 0;
+  transition: opacity 200ms ease 150ms;
+}
+.lab-bar-row[data-open] .lab-search input {
+  opacity: 1;
 }
 .lab-search input::placeholder {
   color: rgba(17, 24, 39, 0.45);
@@ -322,8 +357,17 @@
   text-align: right;
   font-size: 12px;
   font-weight: 700;
-  color: var(--lab-ink);
-  opacity: var(--open, 0);
+  color: var(--lab-ink, #111827);
+}
+.lab-mark {
+  left: 0;
+  top: 0;
+  border-radius: 999px;
+  pointer-events: none;
+  transition:
+    transform 550ms cubic-bezier(0.3, 1.35, 0.5, 1),
+    width 450ms ease,
+    height 450ms ease;
 }
 
 @media (max-width: 640px) {
@@ -372,23 +416,26 @@
   border-radius: 14px;
   display: block;
 }
-.lab-card-layer {
+.lab-card-pos {
   position: absolute;
-  left: 0;
-  top: 0;
+  left: 50%;
+  top: 50%;
   will-change: transform;
 }
 .lab-player {
-  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 44px;
   display: flex;
   align-items: center;
   gap: 16px;
   padding: 0 26px;
   box-sizing: border-box;
   color: #fff;
-  transform-origin: center;
-  pointer-events: none;
+  cursor: grab;
+  touch-action: none;
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+  background: rgba(18, 16, 14, 0.14);
 }
 .lab-player > img {
   width: 92px;
@@ -674,6 +721,9 @@
 
 /* After the base stage sizes so it can override them */
 @container (max-width: 759px) {
+  .lab-covers-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
   .lab-merge {
     height: 580px;
   }
@@ -683,4 +733,68 @@
   .lab-materials .lab-specimen {
     gap: 28px;
   }
+}
+
+/* How each example is made, under the demo */
+.demo-how {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  text-align: left;
+}
+.demo-how summary {
+  cursor: pointer;
+  width: max-content;
+  list-style: none;
+}
+.demo-how summary::-webkit-details-marker {
+  display: none;
+}
+.demo-how summary::before {
+  content: '+ ';
+}
+.demo-how details[open] summary::before {
+  content: '− ';
+}
+
+/* Dark theme, following the home page's palette: #111827 page, #171f28 panels, light text */
+[data-theme='dark'] .lab-merge {
+  background: #171f28;
+}
+[data-theme='dark'] .lab-editorial {
+  color: #e5e7eb;
+}
+[data-theme='dark'] .lab-editorial header {
+  border-bottom-color: #e5e7eb;
+}
+[data-theme='dark'] .lab-toolbar,
+[data-theme='dark'] .lab-search,
+[data-theme='dark'] .lab-search input,
+[data-theme='dark'] .lab-count {
+  color: #f3f4f6;
+}
+[data-theme='dark'] .lab-search input::placeholder {
+  color: rgba(243, 244, 246, 0.5);
+}
+[data-theme='dark'] .lab-materials {
+  background: #171f28;
+}
+[data-theme='dark'] .lab-specimen {
+  color: #e5e7eb;
+}
+[data-theme='dark'] .lab-row-checker {
+  background: repeating-linear-gradient(45deg, #e5e7eb 0 6px, transparent 6px 12px);
+}
+[data-theme='dark'] .lab-lens-label {
+  background: rgba(23, 31, 40, 0.86);
+  color: #f3f4f6;
+}
+[data-theme='dark'] .lab-lens-label span {
+  color: #9ca3af;
+}
+[data-theme='dark'] .lab-adaptive {
+  background: linear-gradient(180deg, #1f2937, #171f28);
 }

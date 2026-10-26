@@ -22,6 +22,8 @@ const MAX_SCANNED_ELEMENTS = 5000
 // How far around the glass its copy reaches, as a multiple of the glass's longer side. Glass that moves past it
 // (a dragged lens) is cloned again around its new place
 const REGION_MARGIN = 1
+// Glass passing its own bounds (a group) can span a whole demo; reaching that far again around it would copy the page
+const MAX_BOUNDS_MARGIN = 160
 // How far inside the glass's edge its copy ends, leaving the rim to the specular highlight
 const RIM_INSET = 1.5
 // Room the frame leaves around the measured copy, for what paints outside boxes (shadows, outlines), and the grid it
@@ -68,6 +70,13 @@ type Glass = {
   layer: HTMLElement
   /** WebKit's copy filter, written relative to a frame around the copy */
   filter?: SVGFilterElement | null
+  /** Whether the wrapper's own content is refracted too. Default true */
+  ownContent?: boolean
+  /** The area the copy has to cover, in viewport pixels. Defaults to the container's box; a group passes its members' */
+  bounds?: () => DOMRect
+  /** The part of the container the filter works on, in its pixels. Defaults to all of it. WebKit filters on the CPU,
+   * so a group whose members cover a corner of its layer only pays for that corner */
+  area?: () => { x: number; y: number; width: number; height: number }
 }
 
 const isTransparent = (color: string) =>
@@ -92,9 +101,11 @@ function backgroundBehind(element: HTMLElement) {
 type Region = { left: number; top: number; right: number; bottom: number }
 
 // The area a copy covers: the glass, and as far around it as the glass may move before it's cloned again
+const boundsOf = (glass: Glass) => glass.bounds?.() ?? glass.container.getBoundingClientRect()
+
 function regionAround(glass: Glass, sourceRect: DOMRect): Region {
-  const rect = glass.container.getBoundingClientRect()
-  const margin = Math.max(rect.width, rect.height) * REGION_MARGIN
+  const rect = boundsOf(glass)
+  const margin = Math.min(Math.max(rect.width, rect.height) * REGION_MARGIN, glass.bounds ? MAX_BOUNDS_MARGIN : Infinity)
   return {
     left: rect.left - sourceRect.left - margin,
     top: rect.top - sourceRect.top - margin,
@@ -212,6 +223,8 @@ function cloneBackdrop(source: HTMLElement, glass: Glass) {
 
   const glassZ = zIndexOf(getComputedStyle(glass.wrapper))
   const removed = new Set<Element>()
+  // Content painted above the glass, left out of the copy
+  const above: Element[] = []
   const media: MediaPair[] = []
   const loading: Array<() => Promise<unknown>> = []
   let hasContent = false
@@ -239,6 +252,7 @@ function cloneBackdrop(source: HTMLElement, glass: Glass) {
           !!(glass.container.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING)))
     // This glass's own content moves with it, so it gets a separate copy (see cloneOwnContent)
     if (element === glass.wrapper || isGlassLayer || isAbove || style.display === 'none') {
+      if (isAbove) above.push(element)
       removed.add(element)
       clone.remove()
       return
@@ -288,7 +302,7 @@ function cloneBackdrop(source: HTMLElement, glass: Glass) {
       new Promise((resolve) => setTimeout(resolve, MAX_READY_WAIT)),
     ])
   // A pruned copy only covers its region, so it has to be cloned again once the glass leaves it
-  return { source, root, media, ready, kept, region: pruned ? region : undefined }
+  return { source, root, media, ready, kept, above, region: pruned ? region : undefined }
 }
 
 // Make a clone a static picture, placed with left/top by the copy. Drop the original's own offsets,
@@ -518,7 +532,8 @@ function createBackdropCopy(glass: Glass) {
   // Copy of the glass's own content, painted above the backdrop copy
   let own: HTMLElement | null = null
   let ownApplied = ''
-  let ownChanged = true
+  const withOwn = glass.ownContent !== false
+  let ownChanged = withOwn
   let lastOwnBuild = -Infinity
   let ownOffset = { x: 0, y: 0 }
   let ownExtent: Extent | undefined
@@ -544,7 +559,7 @@ function createBackdropCopy(glass: Glass) {
       (record) => !isGlassInternal(record.target) && !(record.type === 'attributes' && record.target === glass.wrapper),
     )
   })
-  ownObserver.observe(glass.wrapper, { subtree: true, childList: true, attributes: true, characterData: true })
+  if (withOwn) ownObserver.observe(glass.wrapper, { subtree: true, childList: true, attributes: true, characterData: true })
 
   // A pruned copy doesn't depend on elements it left out that are still away from the glass, such as
   // animations elsewhere on the page. Anything that moves into the region is checked by its new rect
@@ -563,6 +578,9 @@ function createBackdropCopy(glass: Glass) {
         if (isGlassInternal(record.target) || glass.wrapper.contains(record.target)) continue
         if (record.type === 'attributes' && record.target.contains(glass.wrapper)) continue
         if (outsideCopy(record.target)) continue
+        // Content above the glass isn't in the copy, so restyling or animating it (a cursor, a tooltip) changes nothing.
+        // A class change may move it under the glass, so that still counts
+        if (record.attributeName !== 'class' && active?.above.some((element) => element.contains(record.target))) continue
         domChanged = true
         return
       }
@@ -679,7 +697,9 @@ function createBackdropCopy(glass: Glass) {
     if (clipPath !== appliedClipPath) glass.layer.style.clipPath = appliedClipPath = clipPath
 
     // Glass that moved past what its pruned copy covers needs a copy around its new place
-    if (active.region && !contains(containerRect, active.region, active.source.getBoundingClientRect())) domChanged = true
+    if (active.region && !contains(glass.bounds ? boundsOf(glass) : containerRect, active.region, active.source.getBoundingClientRect())) {
+      domChanged = true
+    }
 
     align(active, containerRect, scale)
     if (own) {
@@ -726,7 +746,8 @@ function createBackdropCopy(glass: Glass) {
     right = width + Math.ceil((right - width + FRAME_PADDING) / FRAME_STEP) * FRAME_STEP
     bottom = height + Math.ceil((bottom - height + FRAME_PADDING) / FRAME_STEP) * FRAME_STEP
 
-    const next = `${left},${top},${right},${bottom},${width},${height}`
+    const area = glass.area?.() ?? { x: 0, y: 0, width, height }
+    const next = `${left},${top},${right},${bottom},${width},${height},${area.x},${area.y},${area.width},${area.height}`
     if (next === appliedFrame) return
     appliedFrame = next
     const frameWidth = right - left
@@ -734,10 +755,10 @@ function createBackdropCopy(glass: Glass) {
     Object.assign(frame.style, { left: `${left}px`, top: `${top}px`, width: `${frameWidth}px`, height: `${frameHeight}px` })
 
     for (const primitive of glass.filter.querySelectorAll(`[${FRAME_ATTRIBUTE}]`)) {
-      primitive.setAttribute('x', String(-left / frameWidth))
-      primitive.setAttribute('y', String(-top / frameHeight))
-      primitive.setAttribute('width', String(width / frameWidth))
-      primitive.setAttribute('height', String(height / frameHeight))
+      primitive.setAttribute('x', String((area.x - left) / frameWidth))
+      primitive.setAttribute('y', String((area.y - top) / frameHeight))
+      primitive.setAttribute('width', String(area.width / frameWidth))
+      primitive.setAttribute('height', String(area.height / frameHeight))
     }
     // Displacement in frame units multiplies x by the frame's width and y by its height. Scaling both channels to the
     // shorter side keeps the refraction isotropic, so one scale, in units of that side, serves both axes
@@ -790,7 +811,12 @@ function createBackdropCopy(glass: Glass) {
     stylesChanged = true
   }
 
-  return { update, dispose, invalidate }
+  // Re-aligns right away, for a glass that just changed its filter
+  const refresh = () => {
+    if (glass.container.isConnected && visible) place()
+  }
+
+  return { update, dispose, invalidate, refresh }
 }
 
 // One animation loop for every glass with a copy
@@ -815,13 +841,14 @@ function watchStyles() {
   document.fonts?.ready.then(invalidateAll)
 }
 
-/** Starts cloning and aligning the backdrop of a glass. Returns a cleanup function */
+/** Starts cloning and aligning the backdrop of a glass. Returns a cleanup function, which also has `refresh()` to
+ * re-align the copy and its filter at once */
 export function attachBackdropCopy(glass: Glass) {
   const copy = createBackdropCopy(glass)
   copies.add(copy)
   watchStyles()
   if (!frame) frame = requestAnimationFrame(tick)
-  return () => {
+  return Object.assign(() => {
     copies.delete(copy)
     copy.dispose()
     glass.layer.style.backgroundColor = ''
@@ -830,5 +857,5 @@ export function attachBackdropCopy(glass: Glass) {
       stylesObserver?.disconnect()
       stylesObserver = null
     }
-  }
+  }, { refresh: copy.refresh })
 }

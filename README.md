@@ -53,6 +53,26 @@ function App() {
 | `blur` | `number` | `0.1` | `0-10` | Backdrop blur in pixels |
 | `dispersion` | `number \| false` | `0.5` | `0-3.0` | Spectral (rainbow) dispersion along the refracting edge, like Figma's glass. Scales with the glass size and fades out as `depth` approaches 0 |
 | `specular` | `number \| false` | `0.5` | `0-1.0` | Intensity of the specular rim highlight |
+| `light` | `number \| 'pointer'` | top left | `0-360` | Where the light comes from: an angle in degrees (0 above, 90 right), or `'pointer'` to follow the cursor |
+| `pressable` | `boolean` | `false` | - | Swell under a press, with a small lens forming under the finger |
+| `ripple` | `boolean` | `false` | - | Send a ripple through the glass from every tap |
+
+`<Vaso>` forwards `ref` to its root element.
+
+### `<VasoGroup>`
+
+Glass that merges. Every `<Vaso>` inside becomes part of one glass, and members that come close flow into each
+other like drops of water. Move members however you like (CSS transitions, transforms, an animation library); the
+group follows them every frame.
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `smooth` | `number` | `24` | Width of the liquid neck between members, in px. `0` joins them without blending |
+| `depth`, `blur`, `dispersion`, `specular`, `light` | | | As on `<Vaso>`, for the whole group (`depth` defaults to `1`) |
+| `overflow` | `number` | `64` | How far past the group's box members may reach and still be glass |
+
+Members keep their own `outset` and `radius`; the group's props decide how the glass looks. In Safari and Firefox the
+group refracts a copy of the backdrop, like a single `<Vaso>` does there.
 
 ### Browser Support
 
@@ -79,9 +99,14 @@ const glass = createGlass(document.querySelector('.toolbar'), { depth: 1.2, blur
 
 glass.update({ depth: 2 }) // merges into the current options; cheap enough for every animation frame
 glass.destroy() // removes everything the glass added
+
+// Merging glass: one group, any number of members
+const group = createGlassGroup(document.querySelector('.bar'), { smooth: 32, depth: 1.2 })
+const member = group.add(document.querySelector('.search-button'))
+member.remove()
 ```
 
-Options are the props above, without `component` and `children`. The element's own content stays on top of
+Options are the props above, without `component` and `children`. `createGlassGroup` works in every browser, with the same backdrop copy as `createGlass` in Safari and Firefox. The element's own content stays on top of
 the glass.
 
 ## Examples
@@ -128,6 +153,25 @@ Leave out `radius` and the glass follows the element's own `border-radius`.
 ```tsx
 <Vaso className="rounded-full" depth={1.4} outset={4}>
   <span>Dark</span>
+</Vaso>
+```
+
+### Merging glass
+
+Members that touch melt into one shape. Here a button sits beside a bar; widen it in CSS and it flows out of it.
+
+```tsx
+<VasoGroup smooth={32} depth={1.2}>
+  <Vaso className="toolbar">…</Vaso>
+  <Vaso className="search-button">…</Vaso>
+</VasoGroup>
+```
+
+### Press and ripple
+
+```tsx
+<Vaso pressable ripple light="pointer" radius={44} depth={1.4} blur={1.2}>
+  <Player />
 </Vaso>
 ```
 

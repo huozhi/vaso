@@ -25,6 +25,13 @@ reference for props, defaults and browser behavior.
   Controls: depth 1–1.5, blur 0.3–1. Lenses: depth 2–3. Panels: depth 0.2–0.5,
   blur 4–8. Negative depth makes a concave lens.
 
+## Merging, press and light
+
+- Glass that should merge (a button peeling off a toolbar, highlights that touch): put the `<Vaso>` pieces in one
+  `<VasoGroup smooth={…}>` and move them with CSS. Don't build blob shapes by hand.
+- Tactile controls: `<Vaso pressable ripple>`. Rim that follows the cursor: `light="pointer"`.
+- Animate position and scale with CSS transforms on a wrapper; they cost nothing. `<Vaso>` forwards `ref`.
+
 ## Make sure it shows
 
 - Glass needs something behind it to bend: text, imagery, a gradient. Over a flat
