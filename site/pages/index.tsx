@@ -2,11 +2,9 @@
 
 import { Analytics } from '@vercel/analytics/react'
 import { GlassProvider, GlassScope } from '../contexts/glass-context'
-import { VasoTitle } from '../components/vaso-title'
 import { ResizableGlass } from '../components/resizable-glass'
 import { GlassPanel } from '../components/glass-panel'
 import { ThemeSwitch } from '../components/theme-switch'
-import { LensDemo } from '../components/lens-demo'
 import { OutsetGallery } from '../components/outset-gallery'
 import { FrostedCard } from '../components/frosted-card'
 import { SegmentedControl } from '../components/segmented-control'
@@ -17,9 +15,16 @@ import { FloatingGlass, glassTarget } from '../components/floating-glass'
 import { CodeBlock } from '../components/code-block'
 import { SiteFooter } from '../components/site-footer'
 import { useState } from 'react'
+import { GlassText } from '../lab/sections/glass-text'
+import { LiquidSearch } from '../lab/sections/merge'
+import { LiquidTouch } from '../lab/sections/liquid-touch'
+import { Materials } from '../lab/sections/materials'
+import { AdaptiveInk } from '../lab/sections/adaptive'
+import { useChromium } from '../lab/ui'
 
 import '../styles/globals.css'
 import '../styles/page.css'
+import '../lab/lab.css'
 
 const USAGE_CODE = `import { Vaso } from 'vaso'
 
@@ -35,12 +40,15 @@ function DemoCard({
   title,
   caption,
   wide,
+  preview,
   align = 'center',
   children,
 }: {
   title: string
   caption?: string
   wide?: boolean
+  /** Not in the package yet: built on the lab engine, headed for vaso/core */
+  preview?: boolean
   align?: 'start' | 'center'
   children: React.ReactNode
 }) {
@@ -48,6 +56,11 @@ function DemoCard({
     <figure className={`flex flex-col gap-5 min-w-0 ${wide ? 'md:col-span-2' : ''}`}>
       <figcaption className={`text-xs theme-label ${align === 'center' ? 'text-center' : ''}`}>
         <span className="font-semibold theme-heading">{title}</span>
+        {preview && (
+          <span className="ml-2 px-1.5 py-px rounded border border-[var(--theme-border-color)] text-[10px] uppercase tracking-wide">
+            Preview
+          </span>
+        )}
         {caption && <> · {caption}</>}
       </figcaption>
       <div className={`flex ${align === 'center' ? 'justify-center' : 'justify-start'}`}>{children}</div>
@@ -57,6 +70,7 @@ function DemoCard({
 
 function Home() {
   const [theme, setTheme] = useState('light')
+  const chromium = useChromium()
 
   return (
     <>
@@ -72,75 +86,94 @@ function Home() {
 
       <div
         id="top"
-        className="min-h-screen lg:p-8 lg:pt-22 lg:pb-32 p-2 pt-[calc(2rem+30px)] pb-8 root"
+        className="min-h-screen root"
         data-theme={theme}
         style={{ fontFamily: "'JetBrains Mono', monospace" }}
       >
+        {/* Banner: the word itself is the glass. Move to light it, tap to ripple */}
+        <h1 className="sr-only">Vaso</h1>
+        <GlassText className="home-banner">
+          {/* The page's own theme toggle, sitting on the photo */}
+          <div className="absolute top-7 right-7 z-20" onPointerDown={(e) => e.stopPropagation()}>
+            <GlassScope id="theme" label="Theme switch">
+              <ThemeSwitch theme={theme} setTheme={setTheme} />
+            </GlassScope>
+          </div>
+        </GlassText>
+
+        <div className="lg:p-8 lg:pt-12 lg:pb-32 p-2 pt-8 pb-8">
         <div className="max-w-3xl mx-auto">
-          <header className="relative mb-8 flex items-center justify-between mobile-header">
-            {/* Soft color glow behind the hero */}
-            <div aria-hidden className="hero-glow" />
-            <div className="relative max-w-sm mobile-title">
-              <h1 className="text-[88px] font-bold mb-12 mobile-h1 user-select-none theme-title">
-                <small className="mobile-h1-small font-light mr-8 theme-subtitle"></small>
-                <GlassScope id="title" label="Title">
-                  <VasoTitle />
-                </GlassScope>
-              </h1>
-              <p className="text-lg theme-description">Liquid Glass Effect for React</p>
-            </div>
-          </header>
+          <p className="mb-8 px-4 lg:px-8 sm:px-4 text-lg theme-description">Liquid Glass Effect for React</p>
 
           {/* Floating controls, opened by double click or long press */}
           <GlassPanel />
 
           <div className="px-4 py-6 lg:p-8 sm:p-4 space-y-8 rounded-lg theme-content">
             <section id="examples" className="relative border-b pb-6 theme-section">
-              <h2 className="text-lg font-semibold mb-4 theme-heading">Examples</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-20 pt-8 border-t border-[var(--theme-border-color)]">
-                <DemoCard title="Theme switch" align="start">
-                  <GlassScope id="theme" label="Theme switch">
-                    <ThemeSwitch theme={theme} setTheme={setTheme} />
+              <h2 className="text-lg font-semibold mb-1 theme-heading">Examples</h2>
+              <p className="text-xs theme-label mb-4">
+                Preview: coming in vaso/core{!chromium && ', refracts in Chromium browsers for now'}
+              </p>
+
+              {/* The big ones, one per row */}
+              <div className="grid grid-cols-1 gap-y-16 pt-8 border-t border-[var(--theme-border-color)]">
+                <DemoCard title="Liquid search" caption="matches light up with glass that flows between them" preview>
+                  <div className="lab-frame">
+                    <LiquidSearch />
+                  </div>
+                </DemoCard>
+                <DemoCard title="Crystal balls">
+                  <GlassScope id="crystal" label="Crystal balls">
+                    <CrystalBalls />
                   </GlassScope>
                 </DemoCard>
-                <DemoCard title="Resizable glass" caption="drag the handle" align="start">
-                  <GlassScope id="resizable" label="Resizable glass">
-                    <ResizableGlass />
-                  </GlassScope>
+                <DemoCard title="Liquid touch" caption="press and drag" preview>
+                  <div className="lab-frame">
+                    <LiquidTouch />
+                  </div>
                 </DemoCard>
-                <DemoCard title="Lens" caption="drag it anywhere on the page" wide>
-                  <GlassScope id="lens" label="Lens">
-                    <LensDemo />
-                  </GlassScope>
-                </DemoCard>
-                <DemoCard title="Frosted glass" caption="toggle frost on every glass" wide>
+                <DemoCard title="Frosted glass" caption="toggle frost on every glass">
                   <GlassScope id="frosted" label="Frosted glass">
                     <FrostedCard />
                   </GlassScope>
                 </DemoCard>
-                <DemoCard title="Segmented control" caption="the pill bounces into place" wide>
+                <DemoCard title="Materials" caption="same optics, different matter" preview>
+                  <div className="lab-frame">
+                    <Materials />
+                  </div>
+                </DemoCard>
+                <DemoCard title="Adaptive ink" caption="the bars pick their ink from what scrolls beneath" preview>
+                  <div className="lab-frame">
+                    <AdaptiveInk />
+                  </div>
+                </DemoCard>
+              </div>
+
+              {/* The small ones, packed two to a row */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-12 mt-16 pt-10 border-t border-[var(--theme-border-color)]">
+                <DemoCard title="Segmented control" caption="the pill bounces into place">
                   <GlassScope id="segmented" label="Segmented control">
                     <SegmentedControl />
                   </GlassScope>
                 </DemoCard>
-                <DemoCard title="Color picker" caption="drag the lens around the wheel" wide>
+                <DemoCard title="Resizable glass" caption="drag the handle">
+                  <GlassScope id="resizable" label="Resizable glass">
+                    <ResizableGlass />
+                  </GlassScope>
+                </DemoCard>
+                <DemoCard title="Color picker" caption="drag the lens">
                   <GlassScope id="color" label="Color picker">
                     <ColorPicker />
                   </GlassScope>
                 </DemoCard>
-                <DemoCard title="Crystal balls" wide>
-                  <GlassScope id="crystal" label="Crystal balls">
-                    <CrystalBalls />
+                <DemoCard title="Notification">
+                  <GlassScope id="notification" label="Notification">
+                    <ToastStack />
                   </GlassScope>
                 </DemoCard>
                 <DemoCard title="Outset" caption="how far the glass reaches past the letter" wide>
                   <GlassScope id="outset" label="Outset">
                     <OutsetGallery />
-                  </GlassScope>
-                </DemoCard>
-                <DemoCard title="Notification" wide>
-                  <GlassScope id="notification" label="Notification">
-                    <ToastStack />
                   </GlassScope>
                 </DemoCard>
               </div>
@@ -188,6 +221,7 @@ function Home() {
               <SiteFooter />
             </section>
           </div>
+        </div>
         </div>
       </div>
     </>

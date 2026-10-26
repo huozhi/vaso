@@ -10,6 +10,18 @@ A beautiful liquid glass distortion effect component for React that creates stun
 npm add vaso
 ```
 
+<details>
+<summary>Install the agent skill</summary>
+
+```sh
+npx skills add huozhi/vaso --skill vaso
+```
+
+The skill teaches compatible coding agents when and how to use Vaso. The full agent reference is at
+[vaso-react.vercel.app/llms.txt](https://vaso-react.vercel.app/llms.txt).
+
+</details>
+
 ## Quick Start
 
 ```tsx

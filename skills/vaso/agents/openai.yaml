@@ -1,0 +1,4 @@
+interface:
+  display_name: "Vaso"
+  short_description: "Liquid glass effect for React"
+  default_prompt: "Use $vaso to add a liquid glass effect to this React UI."

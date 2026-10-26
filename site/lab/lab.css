@@ -1,0 +1,686 @@
+/* Vaso Lab — standalone styles (no Tailwind dependency) */
+
+.lab-root {
+  --lab-bg: rgb(245 244 237);
+  --lab-ink: #111827;
+  --lab-muted: #4b5563;
+  --lab-line: rgba(17, 24, 39, 0.1);
+  --lab-accent: #111827;
+  min-height: 100vh;
+  background: var(--lab-bg);
+  color: var(--lab-ink);
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  padding: 0 16px 96px;
+  overflow-x: hidden;
+}
+
+.lab-wrap {
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+.lab-notice {
+  margin: 24px 0 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(17, 24, 39, 0.06);
+  color: var(--lab-ink);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.lab-section {
+  margin-top: 72px;
+}
+.lab-section-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 18px;
+  align-items: start;
+  margin-bottom: 18px;
+}
+.lab-index {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--lab-ink);
+  padding-top: 5px;
+}
+.lab-section-head h2 {
+  margin: 0 0 6px;
+  font-size: 20px;
+  letter-spacing: -0.01em;
+}
+.lab-section-head p {
+  margin: 0;
+  color: var(--lab-muted);
+  font-size: 13px;
+  line-height: 1.7;
+  max-width: 640px;
+}
+.lab-aside {
+  font-size: 12px;
+  color: var(--lab-muted);
+  white-space: nowrap;
+}
+
+/* Stage: the backdrop and the glass above it */
+.lab-stage {
+  position: relative;
+  overflow: hidden;
+  border-radius: 28px;
+  background: #111;
+  user-select: none;
+  -webkit-user-select: none;
+  isolation: isolate;
+}
+/* Stages size to the column they sit in, not the viewport: the same demo lives in the narrow homepage column
+   and on the wide lab page */
+.lab-frame {
+  container-type: inline-size;
+  width: 100%;
+}
+.lab-fill {
+  position: absolute;
+  inset: 0;
+}
+
+/* Hint pill */
+.lab-hint {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 32px);
+  padding: 7px 12px 7px 10px;
+  border-radius: 999px;
+  background: rgba(16, 15, 12, 0.62);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.3;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  pointer-events: none;
+  transition: opacity 600ms ease, transform 600ms ease;
+}
+.lab-hint-right {
+  left: auto;
+  right: 16px;
+}
+.lab-hint-top {
+  top: 16px;
+  bottom: auto;
+}
+.lab-hint.is-done {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.lab-hint-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: #fff;
+  animation: lab-pulse 1.6s ease-out infinite;
+}
+@keyframes lab-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); }
+  100% { box-shadow: 0 0 0 10px rgba(255, 255, 255, 0); }
+}
+
+/* Ghost cursor */
+.lab-ghost {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 15;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+.lab-ghost-ring {
+  width: 30px;
+  height: 30px;
+  margin: -15px 0 0 -15px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.35);
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  transition: transform 160ms ease;
+}
+.lab-ghost[data-pressed='true'] .lab-ghost-ring {
+  transform: scale(0.78);
+  background: rgba(255, 255, 255, 0.55);
+}
+
+/* 01 · Glass text */
+.lab-hero {
+  /* Full-bleed banner at the top of the page */
+  height: clamp(380px, 82vh, 860px);
+  border-radius: 0;
+  cursor: crosshair;
+}
+.lab-banner {
+  /* The lab page pads its content; the banner breaks out of it */
+  margin: 0 -16px;
+}
+.lab-hero-backdrop,
+.lab-hero-backdrop img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.lab-hero-backdrop img {
+  object-fit: cover;
+  animation: lab-kenburns 26s ease-in-out infinite alternate;
+}
+@keyframes lab-kenburns {
+  from { transform: scale(1.08) translate(-2%, -1%); }
+  to { transform: scale(1.22) translate(3%, 2%); }
+}
+.lab-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.28) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.28) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* 02 · Merge */
+.lab-merge {
+  height: clamp(420px, 38vw, 440px);
+  background: #f6f1e7;
+}
+.lab-merge[data-dragging] {
+  cursor: grabbing;
+}
+.lab-editorial {
+  position: absolute;
+  inset: 0;
+  /* Room at the top for the hint */
+  padding: 58px 30px 26px;
+  color: #1d1a14;
+  font-family: Georgia, 'Times New Roman', serif;
+  overflow: hidden;
+}
+.lab-editorial header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  border-bottom: 2px solid #1d1a14;
+  padding-bottom: 8px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.lab-editorial header strong {
+  font-family: Georgia, serif;
+  font-size: 26px;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  font-style: italic;
+}
+.lab-editorial h3 {
+  font-size: clamp(22px, 3.2vw, 38px);
+  line-height: 1.12;
+  margin: 18px 0 16px;
+  max-width: 820px;
+  letter-spacing: -0.02em;
+}
+.lab-columns {
+  columns: 3 220px;
+  column-gap: 26px;
+  font-size: 15px;
+  line-height: 1.6;
+}
+.lab-columns p {
+  margin: 0 0 12px;
+}
+.lab-columns figure {
+  margin: 0 0 12px;
+  break-inside: avoid;
+}
+.lab-columns img {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  display: block;
+  filter: saturate(1.2);
+}
+.lab-toolbar,
+.lab-search {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  color: #111827;
+  font-size: 13px;
+}
+.lab-toolbar {
+  gap: 18px;
+  pointer-events: none;
+}
+.lab-back,
+.lab-search-icon {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 22px;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.lab-url {
+  flex: 1;
+  height: 100%;
+  border: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  opacity: calc(0.75 * (1 - var(--open, 0) * 2));
+  white-space: nowrap;
+  cursor: text;
+  pointer-events: auto;
+}
+.lab-search {
+  overflow: hidden;
+}
+.lab-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: none;
+  font: inherit;
+  font-size: 15px;
+  color: #111827;
+  opacity: calc(var(--open, 0) * 2 - 1);
+  pointer-events: auto;
+}
+.lab-search input::placeholder {
+  color: rgba(17, 24, 39, 0.45);
+}
+.lab-count {
+  flex: none;
+  min-width: 36px;
+  padding-right: 18px;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--lab-ink);
+  opacity: var(--open, 0);
+}
+
+@media (max-width: 640px) {
+  .lab-section-head {
+    grid-template-columns: auto 1fr;
+  }
+  .lab-aside {
+    display: none;
+  }
+  .lab-stage {
+    border-radius: 20px;
+  }
+  .lab-stage.lab-hero {
+    border-radius: 0;
+  }
+  .lab-editorial {
+    padding: 54px 18px 18px;
+  }
+  .lab-columns {
+    font-size: 13px;
+  }
+}
+
+/* 03 · Liquid touch */
+.lab-touch {
+  height: clamp(380px, 40vw, 460px);
+}
+.lab-covers {
+  position: absolute;
+  inset: 0;
+  animation: lab-rise 40s linear infinite;
+}
+@keyframes lab-rise {
+  to { transform: translateY(-50%); }
+}
+.lab-covers-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+  padding: 5px 10px;
+}
+.lab-covers-grid img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 14px;
+  display: block;
+}
+.lab-card-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  will-change: transform;
+}
+.lab-player {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 26px;
+  box-sizing: border-box;
+  color: #fff;
+  transform-origin: center;
+  pointer-events: none;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+}
+.lab-player > img {
+  width: 92px;
+  height: 92px;
+  flex: none;
+  border-radius: 16px;
+  object-fit: cover;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+.lab-player-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+.lab-player-meta strong {
+  font-size: 17px;
+}
+.lab-player-meta span {
+  opacity: 0.8;
+}
+.lab-progress {
+  margin-top: 10px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.3);
+  overflow: hidden;
+}
+.lab-progress i {
+  display: block;
+  height: 100%;
+  width: 38%;
+  background: #fff;
+  animation: lab-progress 30s linear infinite;
+}
+@keyframes lab-progress {
+  from { width: 8%; }
+  to { width: 96%; }
+}
+.lab-player-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* 05 · Adaptive */
+.lab-adaptive {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 56px;
+  padding: 36px 24px;
+  background: linear-gradient(180deg, #ebe7dc, #e2ddcf);
+}
+.lab-phone {
+  position: relative;
+  width: 340px;
+  height: 600px;
+  max-width: 100%;
+  flex: none;
+  border-radius: 46px;
+  overflow: hidden;
+  background: #000;
+  box-shadow: 0 0 0 10px #111, 0 30px 60px rgba(0, 0, 0, 0.3);
+  isolation: isolate;
+}
+.lab-feed {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+}
+.lab-feed figure {
+  position: relative;
+  margin: 0;
+}
+.lab-feed figure img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.lab-feed figcaption {
+  position: absolute;
+  left: 16px;
+  bottom: 12px;
+  color: #fff;
+  font-size: 12px;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+}
+.lab-card {
+  box-sizing: border-box;
+  padding: 26px 22px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+}
+.lab-card strong {
+  font-family: Georgia, serif;
+  font-size: 24px;
+  font-style: italic;
+}
+.lab-card p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.lab-card-light {
+  background: #fbfaf6;
+  color: #1a1814;
+}
+.lab-card-dark {
+  background: #0d0d0f;
+  color: #f2efe8;
+}
+.lab-bar-layer {
+  position: absolute;
+}
+.lab-bar {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  font-size: 14px;
+  transition: color 280ms ease;
+  pointer-events: none;
+}
+.lab-bar[data-ink='dark'] {
+  color: #15130f;
+}
+.lab-bar[data-ink='light'] {
+  color: #fbfaf6;
+}
+.lab-nav span {
+  font-size: 20px;
+  width: 20px;
+  text-align: center;
+}
+.lab-tabs {
+  padding: 0 28px;
+}
+.lab-thumb {
+  position: absolute;
+  right: 5px;
+  top: 0;
+  z-index: 4;
+  cursor: grab;
+  touch-action: none;
+}
+.lab-thumb:active {
+  cursor: grabbing;
+}
+.lab-thumb-fill {
+  border-radius: 10px;
+  transition: background-color 280ms ease;
+}
+.lab-thumb[data-ink='dark'] .lab-thumb-fill {
+  background-color: rgba(17, 24, 39, 0.2);
+}
+.lab-thumb[data-ink='light'] .lab-thumb-fill {
+  background-color: rgba(255, 255, 255, 0.28);
+}
+
+/* 06 · Materials */
+.lab-materials {
+  height: clamp(360px, 36vw, 420px);
+  background: #f3efe4;
+}
+.lab-specimen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+  color: #17150f;
+}
+.lab-row {
+  display: flex;
+  white-space: nowrap;
+  width: max-content;
+  animation: lab-marquee 38s linear infinite;
+}
+.lab-row-reverse {
+  animation-direction: reverse;
+}
+@keyframes lab-marquee {
+  to { transform: translateX(-50%); }
+}
+.lab-row-serif {
+  font-family: Georgia, serif;
+  font-style: italic;
+  font-size: 54px;
+  line-height: 1;
+}
+.lab-row-mono {
+  font-size: 26px;
+  letter-spacing: 0.08em;
+  animation-duration: 30s;
+  animation-direction: reverse;
+}
+.lab-row-stripes {
+  width: 200%;
+  height: 46px;
+  background: repeating-linear-gradient(90deg, #e63b2e 0 18px, #f5a623 18px 36px, #2ea05f 36px 54px, #2563eb 54px 72px, #8b5cf6 72px 90px, #17150f 90px 98px);
+  animation-duration: 26s;
+}
+.lab-row-checker {
+  width: 200%;
+  height: 34px;
+  background:
+    repeating-linear-gradient(45deg, #17150f 0 6px, transparent 6px 12px);
+  animation-duration: 50s;
+  animation-direction: reverse;
+}
+.lab-lens {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 5;
+}
+.lab-lens-label {
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  transform: translateX(-50%);
+  margin-top: -14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 5px 12px;
+  border-radius: 12px;
+  background: rgba(243, 239, 228, 0.86);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  font-size: 11px;
+  white-space: nowrap;
+  color: #17150f;
+  pointer-events: none;
+}
+.lab-lens-label strong {
+  font-size: 13px;
+}
+.lab-lens-label span {
+  color: #6b675c;
+}
+
+@media (max-width: 760px) {
+  .lab-covers-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .lab-lens-label span {
+    display: none;
+  }
+  .lab-adaptive {
+    flex-direction: column;
+    gap: 28px;
+    padding: 24px 12px 64px;
+  }
+  .lab-phone {
+    width: min(340px, 100%);
+    height: 560px;
+  }
+  .lab-player > img {
+    width: 64px;
+    height: 64px;
+  }
+  .lab-player-controls svg:first-child,
+  .lab-player-controls svg:last-child {
+    display: none;
+  }
+  .lab-row-serif {
+    font-size: 36px;
+  }
+  .lab-row-mono {
+    font-size: 18px;
+  }
+}
+
+/* After the base stage sizes so it can override them */
+@container (max-width: 759px) {
+  .lab-merge {
+    height: 580px;
+  }
+  .lab-materials {
+    height: 460px;
+  }
+  .lab-materials .lab-specimen {
+    gap: 28px;
+  }
+}

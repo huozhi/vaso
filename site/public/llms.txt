@@ -1,0 +1,96 @@
+# Vaso
+
+> Liquid glass for React. `<Vaso>` refracts the live page behind an element through a physically based lens (squircle bezel, Snell's law, spectral dispersion), with a backdrop-copy fallback for Safari and Firefox. One component, no dependencies besides React 18 or 19.
+
+## References
+
+- [Live examples](https://vaso-react.vercel.app/)
+- [Lab: experimental effects, not in the package yet](https://vaso-react.vercel.app/lab)
+- [README](https://github.com/huozhi/vaso/blob/main/README.md)
+- [Source and issues](https://github.com/huozhi/vaso)
+- [npm](https://www.npmjs.com/package/vaso)
+
+## Install
+
+```bash
+npm add vaso
+```
+
+`vaso` is a client component (`'use client'`). In frameworks with server components, render it from a client component.
+
+## Quick start
+
+```tsx
+import { Vaso } from 'vaso'
+
+export function Toolbar() {
+  return (
+    <Vaso radius={24} depth={1.2} blur={0.5} dispersion={0.6} outset={{ x: 8, y: 4 }}>
+      <button>Share</button>
+    </Vaso>
+  )
+}
+```
+
+The glass sizes itself to its children and refracts whatever is painted behind it. It needs something behind it to bend: text, an image, a gradient. On a flat color it looks like a plain rim.
+
+## Props
+
+All standard HTML attributes (className, style, onClick, ...) pass through to the root element.
+
+| Prop | Type | Default | Range | Meaning |
+|---|---|---|---|---|
+| `children` | ReactNode | – | – | Content on top of the glass. Without children, set `width` and `height` |
+| `component` | string \| ComponentType | `'div'` | – | Root element, e.g. `'span'` for inline glass |
+| `width` / `height` | number | content size | – | Explicit size in px |
+| `outset` | number \| `{ x, y, top, right, bottom, left }` | `0` | – | Extends the glass past the element without affecting layout. Sides beat axes |
+| `radius` | number | element's CSS `border-radius` | 0–∞ | Corner radius. Leave it out to follow classes like `rounded-full` |
+| `depth` | number | `0` | −5 to 5 | Refraction strength at the bezel. Negative = concave (compresses). `0` = flat, no refraction |
+| `blur` | number | `0.1` | 0–10 | Backdrop blur in px. High values read as frosted glass |
+| `dispersion` | number \| false | `0.5` | 0–3 | Rainbow split along the refracting edge. Fades out as depth → 0 |
+| `specular` | number \| false | `0.5` | 0–1 | Rim highlight intensity |
+| `px` / `py` | number | – | – | Deprecated, use `outset={{ x, y }}` |
+
+Exports: `Vaso`, and the types `VasoProps`, `Outset`.
+
+## Recipes
+
+Button or pill around content:
+
+```tsx
+<Vaso className="rounded-full" depth={1.4} outset={4}>
+  <span>Dark</span>
+</Vaso>
+```
+
+Lens over an image (no children, explicit size, positioned over the content):
+
+```tsx
+<div style={{ position: 'relative' }}>
+  <img src="/photo.jpg" />
+  <Vaso width={120} height={120} radius={60} depth={2.5} style={{ position: 'absolute', left: 40, top: 40 }} />
+</div>
+```
+
+Concave lens: `<Vaso width={60} height={60} radius={30} depth={-4} dispersion={1.5} />`
+
+Frosted panel: `<Vaso radius={20} depth={0.3} blur={6} specular={0.9}>…</Vaso>`
+
+Good starting values: controls `depth 1–1.5, blur 0.3–1`; lenses `depth 2–3`; panels `depth 0.2–0.5, blur 4–8`.
+
+## How it renders
+
+- Chromium (Chrome, Edge, Arc, Opera): an SVG displacement filter inside `backdrop-filter` refracts the real backdrop.
+- Safari, Firefox and every iOS browser: Vaso clones the nearest ancestor with visible content into the glass and refracts the copy, kept aligned every frame. Sources over 400 elements aren't cloned; the glass keeps its blur and rim.
+
+## Gotchas
+
+- An ancestor with `filter`, `opacity` < 1, `mask`, `clip-path`, `mix-blend-mode` or its own `backdrop-filter` becomes the backdrop boundary in Chromium: the glass only sees content inside that ancestor.
+- `depth={0}` (the default) means no refraction. Set a depth to see the effect.
+- Animating the size is fine: Vaso stretches the last displacement map while the size changes and redraws once it settles.
+
+## Performance
+
+- Each dispersion band is a full displacement pass (up to 9 in Chromium). For large glass, or many glass elements at once, use `dispersion={false}` or a low value.
+- Large `blur` on large glass is the next biggest cost.
+- Prefer a few glass elements over dozens; each one is its own compositing layer.
