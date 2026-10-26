@@ -185,6 +185,12 @@ A high `blur` with a bright rim reads as frosted glass.
 </Vaso>
 ```
 
+## Development
+
+`pnpm dev` builds the package, watches it and serves the demo site on http://localhost:3000.
+[`validation/`](./validation) has browser checks for it: smoke tests, cross-browser comparisons, performance and A/B
+regressions, in Chromium, WebKit and Firefox.
+
 ## License
 
 MIT
