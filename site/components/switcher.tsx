@@ -40,21 +40,28 @@ export const Switcher: React.FC<SwitcherProps> = ({ xOption, yOption, value = xO
 
   const isDarkTheme = activeOption === yOption.id
 
+  const next = isLeft ? yOption : xOption
+
+  // The whole switch is one button: a click anywhere on it, the glass knob included, flips it
   return (
-    <div
+    <button
+      type="button"
+      role="switch"
+      aria-checked={!isLeft}
+      aria-label={`Switch to ${next.label}`}
+      onClick={() => handleOptionChange(next.id)}
       className={clsx(
-        'relative flex backdrop-blur-md rounded-full p-1.5 min-w-[120px] h-[40px] transition-all duration-300',
+        'relative flex backdrop-blur-md rounded-full p-1.5 min-w-[120px] h-[40px] transition-all duration-300 cursor-pointer',
         'border-2 shadow-md',
         isDarkTheme ? 'bg-gray-900/80 border border-gray-700/50' : 'bg-white/100 border border-white/100',
         className
       )}
     >
       {options.map((option) => (
-        <button
+        <span
           key={option.id}
-          onClick={() => handleOptionChange(isLeft ? yOption.id : xOption.id)}
           className={clsx(
-            'relative bg-transparent border-0 rounded-full cursor-pointer flex-1',
+            'relative rounded-full flex-1',
             'flex items-center justify-center text-sm font-medium',
             'transition-all duration-300 px-2 py-1',
             activeOption === option.id ? 'z-20' : 'z-10',
@@ -68,7 +75,7 @@ export const Switcher: React.FC<SwitcherProps> = ({ xOption, yOption, value = xO
           )}
         >
           {activeOption !== option.id && <span className="whitespace-nowrap font-medium">{option.label}</span>}
-        </button>
+        </span>
       ))}
 
       {/* Glass overlay using Vaso */}
@@ -79,6 +86,8 @@ export const Switcher: React.FC<SwitcherProps> = ({ xOption, yOption, value = xO
         dispersion={settings.dispersion}
         outset={4}
         className={clsx('vaso-switching', isLeft ? 'vaso-left' : 'vaso-right')}
+        // Let clicks on the knob reach the switch underneath
+        style={{ pointerEvents: 'none' }}
       >
         <div className="flex items-center justify-center w-full h-full">
           {options.find((option) => option.id === activeOption)?.icon && (
@@ -88,6 +97,6 @@ export const Switcher: React.FC<SwitcherProps> = ({ xOption, yOption, value = xO
           )}
         </div>
       </Vaso>
-    </div>
+    </button>
   )
 }
