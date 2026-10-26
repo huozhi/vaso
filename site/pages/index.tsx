@@ -93,6 +93,8 @@ function Home() {
   return (
     <>
       <title>Vaso</title>
+      <meta property="og:title" content="Vaso" />
+      <meta name="twitter:title" content="Vaso" />
       <meta name="description" content="Glass Effect for React" />
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
