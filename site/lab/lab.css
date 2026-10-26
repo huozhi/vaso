@@ -759,3 +759,42 @@
 .demo-how details[open] summary::before {
   content: '− ';
 }
+
+/* Dark theme, following the home page's palette: #111827 page, #171f28 panels, light text */
+[data-theme='dark'] .lab-merge {
+  background: #171f28;
+}
+[data-theme='dark'] .lab-editorial {
+  color: #e5e7eb;
+}
+[data-theme='dark'] .lab-editorial header {
+  border-bottom-color: #e5e7eb;
+}
+[data-theme='dark'] .lab-toolbar,
+[data-theme='dark'] .lab-search,
+[data-theme='dark'] .lab-search input,
+[data-theme='dark'] .lab-count {
+  color: #f3f4f6;
+}
+[data-theme='dark'] .lab-search input::placeholder {
+  color: rgba(243, 244, 246, 0.5);
+}
+[data-theme='dark'] .lab-materials {
+  background: #171f28;
+}
+[data-theme='dark'] .lab-specimen {
+  color: #e5e7eb;
+}
+[data-theme='dark'] .lab-row-checker {
+  background: repeating-linear-gradient(45deg, #e5e7eb 0 6px, transparent 6px 12px);
+}
+[data-theme='dark'] .lab-lens-label {
+  background: rgba(23, 31, 40, 0.86);
+  color: #f3f4f6;
+}
+[data-theme='dark'] .lab-lens-label span {
+  color: #9ca3af;
+}
+[data-theme='dark'] .lab-adaptive {
+  background: linear-gradient(180deg, #1f2937, #171f28);
+}
