@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { attachBackdropCopy, GLASS_ROOT_ATTRIBUTE } from './backdrop-copy'
+import { attachBackdropCopy, FRAME_ATTRIBUTE, FRAME_AXES_ATTRIBUTE, FRAME_SCALE_ATTRIBUTE, GLASS_ROOT_ATTRIBUTE } from './backdrop-copy'
 
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect
 
@@ -111,14 +111,11 @@ function getSvgBackdropSupport() {
   }
   return svgBackdropSupport
 }
-// WebKit (Safari, and every iOS browser) resolves userSpaceOnUse filters on HTML elements against an
-// ancestor instead of the element, so the backdrop copy uses objectBoundingBox units there. Chromium and
-// Firefox scale objectBoundingBox displacement differently from each other, so they keep userSpaceOnUse.
-let webKitFilterUnits: boolean | undefined
-function usesBoundingBoxUnits() {
-  webKitFilterUnits ??=
-    /AppleWebKit\//.test(navigator.userAgent) && !/Chrome\/|Chromium\/|Edg\/|Firefox\//.test(navigator.userAgent)
-  return webKitFilterUnits
+// WebKit: Safari, and every iOS browser
+let webKit: boolean | undefined
+function isWebKit() {
+  webKit ??= /AppleWebKit\//.test(navigator.userAgent) && !/Chrome\/|Chromium\/|Edg\/|Firefox\//.test(navigator.userAgent)
+  return webKit
 }
 // WebKit's Gaussian blur has a minimum kernel, so any blur below about half a pixel renders like ~0.6px and
 // softens everything behind the glass. Chromium keeps blurs that small nearly invisible, so WebKit skips them
@@ -158,20 +155,11 @@ function sampleProfile(t: number) {
 const mapCache = new Map<string, string>()
 let mapCanvas: HTMLCanvasElement | undefined
 
-// `axisScale` pre-scales each axis of the field. objectBoundingBox displacement multiplies x by the
-// width and y by the height, so shrinking the longer axis here keeps the refraction isotropic.
-function getDisplacementMap(
-  width: number,
-  height: number,
-  radius: number,
-  bezel: number,
-  axisScale = { x: 1, y: 1 },
-  cachedOnly = false
-) {
+function getDisplacementMap(width: number, height: number, radius: number, bezel: number, cachedOnly = false) {
   const res = Math.min(1, Math.sqrt(MAX_MAP_PIXELS / (width * height)))
   const w = Math.max(1, Math.round(width * res))
   const h = Math.max(1, Math.round(height * res))
-  const key = `${w}:${h}:${radius}:${bezel}:${axisScale.x}:${axisScale.y}`
+  const key = `${w}:${h}:${radius}:${bezel}`
 
   const cached = mapCache.get(key)
   if (cached) {
@@ -224,8 +212,8 @@ function getDisplacementMap(
       if (distance < bezel) {
         // Light bends toward the center of a convex lens, so sample inward
         const magnitude = sampleProfile(distance / bezel)
-        dx = -Math.sign(cx) * nx * magnitude * axisScale.x
-        dy = -Math.sign(cy) * ny * magnitude * axisScale.y
+        dx = -Math.sign(cx) * nx * magnitude
+        dy = -Math.sign(cy) * ny * magnitude
       }
 
       const i = (y * w + x) * 4
@@ -302,7 +290,6 @@ type Geometry = {
   height: number
   radius: number
   href: string
-  boundingBoxUnits: boolean
   /** The map was drawn for another size and is stretched to this one until the resize settles */
   stale: boolean
 }
@@ -358,22 +345,17 @@ const Vaso: React.FC<VasoProps> = ({
       const cssRadius = parseFloat(getComputedStyle(container).borderTopLeftRadius) || 0
       const finalRadius = Math.min(cssRadius, finalWidth / 2, finalHeight / 2)
 
-      const boundingBoxUnits = copyMode && usesBoundingBoxUnits()
-
       const prev = resize.geometry
       if (
         prev &&
         !(settled && prev.stale) &&
         prev.width === finalWidth &&
         prev.height === finalHeight &&
-        prev.radius === finalRadius &&
-        prev.boundingBoxUnits === boundingBoxUnits
+        prev.radius === finalRadius
       ) {
         return
       }
       const bezel = (Math.min(finalWidth, finalHeight) / 2) * BEZEL_RATIO
-      const shortSide = Math.min(finalWidth, finalHeight)
-      const axisScale = boundingBoxUnits ? { x: shortSide / finalWidth, y: shortSide / finalHeight } : undefined
 
       // A change right after another one is part of a continuous resize (dragging, animating). Drawing and
       // encoding a map for every intermediate size is wasted work, so stretch the last one until it settles
@@ -385,15 +367,15 @@ const Vaso: React.FC<VasoProps> = ({
       let href: string
       let stale = false
       if (resizing) {
-        const cached = getDisplacementMap(finalWidth, finalHeight, finalRadius, bezel, axisScale, true)
+        const cached = getDisplacementMap(finalWidth, finalHeight, finalRadius, bezel, true)
         href = cached ?? prev.href
         stale = !cached
         if (stale) settleLater()
       } else {
-        href = getDisplacementMap(finalWidth, finalHeight, finalRadius, bezel, axisScale) ?? ''
+        href = getDisplacementMap(finalWidth, finalHeight, finalRadius, bezel) ?? ''
       }
 
-      const next = { width: finalWidth, height: finalHeight, radius: finalRadius, href, boundingBoxUnits, stale }
+      const next = { width: finalWidth, height: finalHeight, radius: finalRadius, href, stale }
       resize.geometry = next
       setGeometry(next)
     }
@@ -420,16 +402,13 @@ const Vaso: React.FC<VasoProps> = ({
     const container = containerRef.current
     const layer = layerRef.current
     if (!useCopyFilter || !wrapper || !container || !layer) return
-    return attachBackdropCopy({ wrapper, container, layer })
-  }, [useCopyFilter])
+    const filter = isWebKit() ? wrapper.querySelector<SVGFilterElement>(`#${CSS.escape(filterId)}`) : null
+    return attachBackdropCopy({ wrapper, container, layer, filter })
+  }, [useCopyFilter, filterId])
 
   const bezel = geometry ? (Math.min(geometry.width, geometry.height) / 2) * BEZEL_RATIO : 0
-  // In objectBoundingBox units, displacement is a fraction of the box. The map pre-scales each axis to the
-  // short side, so express pixel offsets as a fraction of it
-  const boundingBoxUnits = !!geometry?.boundingBoxUnits
-  const unit = boundingBoxUnits && geometry ? 1 / Math.min(geometry.width, geometry.height) : 1
   // The map stores unit vectors in [-0.5, 0.5], so double the scale to reach full offset
-  const scale = 2 * depth * bezel * REFRACTION * unit
+  const scale = 2 * depth * bezel * REFRACTION
   // Total separation in pixels between the red and violet images at the rim
   // Flat glass doesn't refract, so fade dispersion out as depth approaches zero
   // Small glass has a narrow rim, where extra bands are indistinguishable; each band is a full displacement pass
@@ -439,16 +418,20 @@ const Vaso: React.FC<VasoProps> = ({
   // The copy's few bands can't cover a wide spread without splitting into colored ghosts of every edge, so
   // narrow it there to what they blend smoothly
   const spreadPx = copyMode ? Math.min(fullSpreadPx, (maxSamples - 1) * MAX_COPY_SPECTRUM_STEP) : fullSpreadPx
-  const spread = spreadPx * unit
   const spectrum =
     spreadPx > 0.5 ? getSpectrum(Math.min(maxSamples, Math.max(3, Math.ceil(spreadPx / SPECTRUM_STEP) + 1))) : null
 
-  const visibleBlur = copyMode && usesBoundingBoxUnits() && blur < WEBKIT_MIN_BLUR ? 0 : blur
+  // WebKit sizes the copy's filter by a frame around the whole copy instead of by the glass, so the filter is
+  // written in fractions of that frame, which backdrop-copy.ts measures. Pixel values go in data attributes for it
+  const framed = useCopyFilter && isWebKit()
+  const inFrame = framed ? { [FRAME_ATTRIBUTE]: '' } : {}
+  const scaleOf = (px: number) => (framed ? { [FRAME_SCALE_ATTRIBUTE]: px } : { scale: px })
+  const visibleBlur = framed && blur < WEBKIT_MIN_BLUR ? 0 : blur
   // Avoid brightness/contrast boosts here: they clip light backdrops to flat white
-  const refractionFilter = `url(#${filterId}) blur(${visibleBlur}px) saturate(1.2)`
+  const frost = `blur(${visibleBlur}px) saturate(1.2)`
   // Without backdrop refraction (Safari, Firefox), keep the same blur as Chromium. The backdrop copy
   // covers what it can; the specular rim and shadow still outline the glass elsewhere
-  const backdropFilter = useSvgFilter ? refractionFilter : `blur(${visibleBlur}px) saturate(1.2)`
+  const backdropFilter = useSvgFilter ? `url(#${filterId}) ${frost}` : frost
 
   return (
     <WrapComponent
@@ -480,26 +463,32 @@ const Vaso: React.FC<VasoProps> = ({
         }}
       >
         {useCopyFilter && (
-          // Sized to the glass so the filter's coordinates line up with the displacement map. Its children
-          // are managed by backdrop-copy.ts, outside React
+          // Safari can paint filtered pixels outside clip-path and rounded overflow, so a mask clips them. It sits on
+          // a wrapper: on the filtered layer itself, it makes WebKit size the filter by the layer alone
           <span
-            ref={layerRef}
             aria-hidden
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: geometry.width,
-              height: geometry.height,
-              // Clip the copy so the element's bounding box, used by objectBoundingBox filters, is the glass.
-              // Not rounded: refraction samples next to the rim, where a rounded edge is transparent and leaves a
-              // colored fringe in the bands that bend least. clip-path rounds the filtered output instead
-              overflow: 'hidden',
-              // Safari can paint filtered pixels outside clip-path and rounded overflow.
-              WebkitMaskImage: '-webkit-radial-gradient(white, black)',
-              filter: refractionFilter,
-            }}
-          />
+            style={{ position: 'absolute', inset: 0, overflow: 'hidden', WebkitMaskImage: '-webkit-radial-gradient(white, black)' }}
+          >
+            {/* Sized to the glass so the filter's coordinates line up with the displacement map. Its children
+                are managed by backdrop-copy.ts, outside React */}
+            <span
+              ref={layerRef}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: geometry.width,
+                height: geometry.height,
+                // Clip the copy so the element's bounding box, used by objectBoundingBox filters, is the glass. Except
+                // in WebKit, which counts positioned descendants regardless; it measures a frame around the copy instead,
+                // and leaving overflow visible makes every WebKit version measure that same frame. Not rounded:
+                // refraction samples next to the rim, where a rounded edge is transparent and leaves a colored fringe in
+                // the bands that bend least. clip-path rounds the filtered output instead
+                overflow: framed ? 'visible' : 'hidden',
+                filter: `url(#${filterId}) ${frost}`,
+              }}
+            />
+          </span>
         )}
       </WrapComponent>
 
@@ -512,40 +501,52 @@ const Vaso: React.FC<VasoProps> = ({
           style={{ position: 'fixed', top: 0, left: 0, pointerEvents: 'none' }}
         >
           <defs>
+            {/* Framed filters keep the whole frame as their region: WebKit misplaces the source for a smaller one.
+                Each primitive is limited to the glass instead, which also keeps the work to the glass's size */}
             <filter
               id={filterId}
-              filterUnits={boundingBoxUnits ? 'objectBoundingBox' : 'userSpaceOnUse'}
-              primitiveUnits={boundingBoxUnits ? 'objectBoundingBox' : 'userSpaceOnUse'}
+              filterUnits={framed ? 'objectBoundingBox' : 'userSpaceOnUse'}
+              primitiveUnits={framed ? 'objectBoundingBox' : 'userSpaceOnUse'}
               colorInterpolationFilters="sRGB"
               x="0"
               y="0"
-              width={boundingBoxUnits ? 1 : geometry.width}
-              height={boundingBoxUnits ? 1 : geometry.height}
+              width={framed ? 1 : geometry.width}
+              height={framed ? 1 : geometry.height}
             >
-              <feImage
-                href={geometry.href}
-                x="0"
-                y="0"
-                width={boundingBoxUnits ? 1 : geometry.width}
-                height={boundingBoxUnits ? 1 : geometry.height}
-                preserveAspectRatio="none"
-                result="map"
-              />
+              {framed ? (
+                <>
+                  <feImage {...inFrame} href={geometry.href} preserveAspectRatio="none" result="rawMap" />
+                  {/* Rescales the map's axes for a frame of another aspect ratio than the glass's */}
+                  <feColorMatrix {...inFrame} {...{ [FRAME_AXES_ATTRIBUTE]: '' }} in="rawMap" type="matrix" result="map" />
+                </>
+              ) : (
+                <feImage
+                  href={geometry.href}
+                  x="0"
+                  y="0"
+                  width={geometry.width}
+                  height={geometry.height}
+                  preserveAspectRatio="none"
+                  result="map"
+                />
+              )}
               {spectrum ? (
                 <>
                   {spectrum.map((matrix, i) => (
                     <React.Fragment key={i}>
                       <feDisplacementMap
+                        {...inFrame}
+                        {...scaleOf(scale + spreadPx * (i / (spectrum.length - 1) - 0.5) * 2)}
                         in="SourceGraphic"
                         in2="map"
-                        scale={scale + spread * (i / (spectrum.length - 1) - 0.5) * 2}
                         xChannelSelector="R"
                         yChannelSelector="G"
                         result={`displaced${i}`}
                       />
-                      <feColorMatrix in={`displaced${i}`} type="matrix" values={matrix} result={`band${i}`} />
+                      <feColorMatrix {...inFrame} in={`displaced${i}`} type="matrix" values={matrix} result={`band${i}`} />
                       {i > 0 && (
                         <feComposite
+                          {...inFrame}
                           in={i === 1 ? 'band0' : `spectrum${i - 1}`}
                           in2={`band${i}`}
                           operator="lighter"
@@ -557,9 +558,10 @@ const Vaso: React.FC<VasoProps> = ({
                 </>
               ) : (
                 <feDisplacementMap
+                  {...inFrame}
+                  {...scaleOf(scale)}
                   in="SourceGraphic"
                   in2="map"
-                  scale={scale}
                   xChannelSelector="R"
                   yChannelSelector="G"
                 />

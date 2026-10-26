@@ -7,6 +7,12 @@
 export const GLASS_ROOT_ATTRIBUTE = 'data-vaso-root'
 /** Marks a glass's layer (the element carrying the filter), which clones leave out */
 export const GLASS_LAYER_ATTRIBUTE = 'data-vaso'
+/** Marks the WebKit copy filter's primitives, which are placed at the glass inside the frame */
+export const FRAME_ATTRIBUTE = 'data-vaso-frame'
+/** A displacement scale in pixels, for WebKit's copy filter to convert to the frame's units */
+export const FRAME_SCALE_ATTRIBUTE = 'data-vaso-scale'
+/** Marks the color matrix that rescales the displacement map's axes to the frame */
+export const FRAME_AXES_ATTRIBUTE = 'data-vaso-axes'
 
 // Cloning a large subtree on every change costs more than the effect is worth; those glasses stay frosted.
 // Only elements behind the glass count: the rest of the source is copied as empty boxes
@@ -16,6 +22,12 @@ const MAX_SCANNED_ELEMENTS = 5000
 // How far around the glass its copy reaches, as a multiple of the glass's longer side. Glass that moves past it
 // (a dragged lens) is cloned again around its new place
 const REGION_MARGIN = 1
+// How far inside the glass's edge its copy ends, leaving the rim to the specular highlight
+const RIM_INSET = 1.5
+// Room the frame leaves around the measured copy, for what paints outside boxes (shadows, outlines), and the grid it
+// snaps to, so a moving glass only rewrites the filter now and then
+const FRAME_PADDING = 32
+const FRAME_STEP = 64
 // Minimum time between re-clones while the source keeps changing (transitions, typing, ...)
 const RECLONE_INTERVAL = 100
 // Video mirrors are drawn at device resolution, capped to keep large glasses cheap
@@ -54,6 +66,8 @@ type Glass = {
   wrapper: HTMLElement
   container: HTMLElement
   layer: HTMLElement
+  /** WebKit's copy filter, written relative to a frame around the copy */
+  filter?: SVGFilterElement | null
 }
 
 const isTransparent = (color: string) =>
@@ -348,11 +362,16 @@ function applySourceStyles(root: HTMLElement, source: HTMLElement) {
   for (const property of INHERITED_PROPERTIES) {
     root.style.setProperty(property, sourceStyle.getPropertyValue(property))
   }
+  // Computed line-height is resolved to pixels, which every descendant would then inherit as is: a large heading in
+  // the clone would get the source's 24px and collapse. Copy it as a ratio so descendants scale it by their own size
+  const lineHeight = parseFloat(sourceStyle.lineHeight)
+  const fontSize = parseFloat(sourceStyle.fontSize)
+  if (lineHeight && fontSize) root.style.lineHeight = String(lineHeight / fontSize)
 }
 
 const isPainted = (style: CSSStyleDeclaration) => !isTransparent(style.backgroundColor) || style.backgroundImage !== 'none'
 
-function findBackdrop(glass: Glass) {
+function findBackdrop(glass: Glass): Clone | null {
   // A transparent ancestor may contain only another glass's icons. Stopping there
   // loses an image or video immediately behind that ancestor and fills the copy
   // with the page color instead. Prefer the nearest ancestor that paints behind the
@@ -459,7 +478,32 @@ function visualScale(element: HTMLElement, rect: DOMRect) {
   return transformed && scale > 0 ? scale : boxScale
 }
 
-type Clone = Exclude<ReturnType<typeof cloneBackdrop>, null | typeof TOO_LARGE> & { applied?: string }
+/** How far a subtree's boxes reach beyond its root's border box, in local pixels */
+type Extent = { left: number; top: number; right: number; bottom: number }
+
+function extentOf(root: Element, scale: number): Extent {
+  const base = root.getBoundingClientRect()
+  let left = 0
+  let top = 0
+  let right = base.width
+  let bottom = base.height
+  for (const element of root.querySelectorAll('*')) {
+    const rect = element.getBoundingClientRect()
+    if (!rect.width && !rect.height) continue
+    left = Math.min(left, rect.left - base.left)
+    top = Math.min(top, rect.top - base.top)
+    right = Math.max(right, rect.right - base.left)
+    bottom = Math.max(bottom, rect.bottom - base.top)
+  }
+  return { left: left / scale, top: top / scale, right: right / scale, bottom: bottom / scale }
+}
+
+type Clone = Exclude<ReturnType<typeof cloneBackdrop>, null | typeof TOO_LARGE> & {
+  applied?: string
+  /** Where the clone's root sits in the layer, in local pixels */
+  offset?: { x: number; y: number }
+  extent?: Extent
+}
 
 function createBackdropCopy(glass: Glass) {
   // The visible clone, and a newer one waiting for its images and videos before replacing it
@@ -476,6 +520,24 @@ function createBackdropCopy(glass: Glass) {
   let ownApplied = ''
   let ownChanged = true
   let lastOwnBuild = -Infinity
+  let ownOffset = { x: 0, y: 0 }
+  let ownExtent: Extent | undefined
+
+  // WebKit sizes objectBoundingBox filters by the element and all of its positioned descendants, even ones the element
+  // clips, and the copy always overflows the glass. An invisible frame around the whole copy pins that size down, and
+  // the filter is written relative to it (see applyFrame)
+  const frame = glass.filter ? document.createElement('span') : null
+  if (frame) {
+    frame.style.cssText = 'position:absolute;pointer-events:none'
+    glass.layer.prepend(frame)
+  }
+  let appliedFrame = ''
+  // React rewrites the filter when the glass's settings change, which needs converting again
+  const filterObserver = new MutationObserver(() => (appliedFrame = ''))
+  if (glass.filter) {
+    filterObserver.observe(glass.filter, { subtree: true, childList: true, attributes: true, attributeFilter: [FRAME_SCALE_ATTRIBUTE, 'href'] })
+  }
+
   const ownObserver = new MutationObserver((records) => {
     // Restyling or moving the glass itself doesn't change its content
     ownChanged ||= records.some(
@@ -522,7 +584,9 @@ function createBackdropCopy(glass: Glass) {
     observer = null
     ownObserver.disconnect()
     moveObserver.disconnect()
+    filterObserver.disconnect()
     visibilityObserver?.disconnect()
+    frame?.remove()
     active?.root.remove()
     pending?.root.remove()
     own?.remove()
@@ -555,6 +619,8 @@ function createBackdropCopy(glass: Glass) {
     pending = found
     glass.layer.insertBefore(found.root, active.root)
     found.ready().then(() => {
+      // Loaded images and videos can change its layout
+      found.extent = undefined
       if (pending !== found) return
       active?.root.remove()
       active = found
@@ -570,9 +636,12 @@ function createBackdropCopy(glass: Glass) {
     const zoom = 1 / scale
     const x = (sourceRect.left - containerRect.left) / scale / zoom
     const y = (sourceRect.top - containerRect.top) / scale / zoom
-    const next = `${x},${y},${clone.source.offsetWidth},${clone.source.offsetHeight},${zoom}`
+    const size = `${clone.source.offsetWidth},${clone.source.offsetHeight},${zoom}`
+    const next = `${x},${y},${size}`
     if (next === clone.applied) return
+    if (!clone.applied?.endsWith(size)) clone.extent = undefined
     clone.applied = next
+    clone.offset = { x: x * zoom, y: y * zoom }
     Object.assign(clone.root.style, {
       left: `${x}px`,
       top: `${y}px`,
@@ -588,6 +657,7 @@ function createBackdropCopy(glass: Glass) {
     own?.remove()
     own = cloneOwnContent(glass)
     ownApplied = ''
+    ownExtent = undefined
     if (own) glass.layer.appendChild(own)
   }
 
@@ -601,9 +671,11 @@ function createBackdropCopy(glass: Glass) {
 
     // Round the filtered output itself (clip-path applies after filter). Safari stops clipping a child to
     // its parent's rounded overflow once the child is composited (e.g. while dragging), which showed the
-    // copy's square corners. Read the radius live, since it may come from CSS
+    // copy's square corners. Read the radius live, since it may come from CSS. Stop short of the rim: refraction
+    // spikes in its last pixel, which samples the far side of the glass and showed as a colored ring, and with
+    // Chromium's backdrop the specular rim is drawn over that pixel anyway, so let it show through here too
     const radius = Math.min(parseFloat(getComputedStyle(glass.container).borderTopLeftRadius) || 0, width / 2, height / 2)
-    const clipPath = `inset(0 round ${radius}px)`
+    const clipPath = `inset(${RIM_INSET}px round ${Math.max(0, radius - RIM_INSET)}px)`
     if (clipPath !== appliedClipPath) glass.layer.style.clipPath = appliedClipPath = clipPath
 
     // Glass that moved past what its pruned copy covers needs a copy around its new place
@@ -617,6 +689,8 @@ function createBackdropCopy(glass: Glass) {
       const next = `${x},${y},${glass.wrapper.offsetWidth},${glass.wrapper.offsetHeight}`
       if (next !== ownApplied) {
         ownApplied = next
+        ownOffset = { x, y }
+        ownExtent = undefined
         Object.assign(own.style, {
           left: `${x}px`,
           top: `${y}px`,
@@ -626,6 +700,56 @@ function createBackdropCopy(glass: Glass) {
       }
     }
     if (pending) align(pending, containerRect, scale)
+    applyFrame(width, height, scale)
+  }
+
+  // Sizes the frame to the copy and writes the filter in fractions of it: each primitive covers the glass's part of
+  // the frame, the map's axes are rescaled for the frame's aspect ratio, and pixel scales become frame units
+  const applyFrame = (width: number, height: number, scale: number) => {
+    if (!frame || !glass.filter) return
+    let left = 0
+    let top = 0
+    let right = width
+    let bottom = height
+    const include = (offset: { x: number; y: number }, extent: Extent) => {
+      left = Math.min(left, offset.x + extent.left)
+      top = Math.min(top, offset.y + extent.top)
+      right = Math.max(right, offset.x + extent.right)
+      bottom = Math.max(bottom, offset.y + extent.bottom)
+    }
+    for (const clone of [active, pending]) {
+      if (clone?.offset) include(clone.offset, (clone.extent ??= extentOf(clone.root, scale)))
+    }
+    if (own) include(ownOffset, (ownExtent ??= extentOf(own, scale)))
+    left = Math.floor((left - FRAME_PADDING) / FRAME_STEP) * FRAME_STEP
+    top = Math.floor((top - FRAME_PADDING) / FRAME_STEP) * FRAME_STEP
+    right = width + Math.ceil((right - width + FRAME_PADDING) / FRAME_STEP) * FRAME_STEP
+    bottom = height + Math.ceil((bottom - height + FRAME_PADDING) / FRAME_STEP) * FRAME_STEP
+
+    const next = `${left},${top},${right},${bottom},${width},${height}`
+    if (next === appliedFrame) return
+    appliedFrame = next
+    const frameWidth = right - left
+    const frameHeight = bottom - top
+    Object.assign(frame.style, { left: `${left}px`, top: `${top}px`, width: `${frameWidth}px`, height: `${frameHeight}px` })
+
+    for (const primitive of glass.filter.querySelectorAll(`[${FRAME_ATTRIBUTE}]`)) {
+      primitive.setAttribute('x', String(-left / frameWidth))
+      primitive.setAttribute('y', String(-top / frameHeight))
+      primitive.setAttribute('width', String(width / frameWidth))
+      primitive.setAttribute('height', String(height / frameHeight))
+    }
+    // Displacement in frame units multiplies x by the frame's width and y by its height. Scaling both channels to the
+    // shorter side keeps the refraction isotropic, so one scale, in units of that side, serves both axes
+    const shorter = Math.min(frameWidth, frameHeight)
+    const sx = shorter / frameWidth
+    const sy = shorter / frameHeight
+    glass.filter
+      .querySelector(`[${FRAME_AXES_ATTRIBUTE}]`)
+      ?.setAttribute('values', `${sx} 0 0 0 ${(1 - sx) / 2}  0 ${sy} 0 0 ${(1 - sy) / 2}  0 0 1 0 0  0 0 0 1 0`)
+    for (const map of glass.filter.querySelectorAll(`[${FRAME_SCALE_ATTRIBUTE}]`)) {
+      map.setAttribute('scale', String(Number(map.getAttribute(FRAME_SCALE_ATTRIBUTE)) / shorter))
+    }
   }
 
   // Scripts often move glass after the shared frame callback has already aligned it (React commits pointer
