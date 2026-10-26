@@ -52,7 +52,7 @@ const refractionProfile = (() => {
   return profile
 })()
 
-function sampleProfile(t: number) {
+export function sampleProfile(t: number) {
   const f = Math.min(Math.max(t, 0), 1) * (PROFILE_SAMPLES - 1)
   const i = Math.floor(f)
   const next = refractionProfile[Math.min(i + 1, PROFILE_SAMPLES - 1)]
@@ -86,11 +86,39 @@ export function getDisplacementMap(width: number, height: number, radius: number
   if (!context) return ''
 
   const image = context.createImageData(w, h)
-  const data = image.data
+  fillRoundRectMap(image.data, w, h, res, width, height, radius, bezel)
+
+  context.putImageData(image, 0, 0)
+  const url = mapCanvas.toDataURL()
+
+  if (mapCache.size >= 32) {
+    mapCache.delete(mapCache.keys().next().value!)
+  }
+  mapCache.set(key, url)
+  return url
+}
+
+/** Adds displacement at a point of the glass, in px from its top left, `inside` px from its edge. Values are in the
+ * map's unit space, where ±1 is the full refraction at the rim */
+export type MapEffect = (x: number, y: number, inside: number, out: { x: number; y: number }) => void
+
+// Writes a rounded rectangle's displacement field into RGBA `data` (w × h cells at `res` cells per px)
+function fillRoundRectMap(
+  data: Uint8ClampedArray,
+  w: number,
+  h: number,
+  res: number,
+  width: number,
+  height: number,
+  radius: number,
+  bezel: number,
+  effect?: MapEffect,
+) {
   const halfW = width / 2
   const halfH = height / 2
   // Round the lens at least as much as the bezel so the displacement field has no seams
   const r = Math.min(Math.max(radius, bezel), halfW, halfH)
+  const extra = { x: 0, y: 0 }
 
   for (let y = 0; y < h; y++) {
     const cy = (y + 0.5) / res - halfH
@@ -124,6 +152,12 @@ export function getDisplacementMap(width: number, height: number, radius: number
         dx = -Math.sign(cx) * nx * magnitude
         dy = -Math.sign(cy) * ny * magnitude
       }
+      if (effect) {
+        extra.x = extra.y = 0
+        effect(cx + halfW, cy + halfH, distance, extra)
+        dx = Math.max(-1, Math.min(1, dx + extra.x))
+        dy = Math.max(-1, Math.min(1, dy + extra.y))
+      }
 
       const i = (y * w + x) * 4
       data[i] = 128 + dx * 127
@@ -132,25 +166,45 @@ export function getDisplacementMap(width: number, height: number, radius: number
       data[i + 3] = 255
     }
   }
-
-  context.putImageData(image, 0, 0)
-  const url = mapCanvas.toDataURL()
-
-  if (mapCache.size >= 32) {
-    mapCache.delete(mapCache.keys().next().value!)
-  }
-  mapCache.set(key, url)
-  return url
 }
 
-export function createSpecularShadow(specular: number | false) {
+// Live maps change every frame of an interaction, so they're drawn coarser than the cached ones
+const MAX_LIVE_MAP_PIXELS = 40_000
+let liveCanvas: HTMLCanvasElement | undefined
+
+/** A one-off map with `effect` added on top of the rounded rectangle (ripples, a press), never cached */
+export function drawLiveMap(width: number, height: number, radius: number, bezel: number, effect: MapEffect) {
+  const res = Math.min(1, Math.sqrt(MAX_LIVE_MAP_PIXELS / (width * height)))
+  const w = Math.max(1, Math.round(width * res))
+  const h = Math.max(1, Math.round(height * res))
+  liveCanvas ??= document.createElement('canvas')
+  liveCanvas.width = w
+  liveCanvas.height = h
+  const context = liveCanvas.getContext('2d')
+  if (!context) return ''
+  const image = context.createImageData(w, h)
+  fillRoundRectMap(image.data, w, h, res, width, height, radius, bezel, effect)
+  context.putImageData(image, 0, 0)
+  return liveCanvas.toDataURL()
+}
+
+export function createSpecularShadow(specular: number | false, angle?: number) {
   const outer = '0 4px 12px rgba(0, 0, 0, 0.18)'
   if (specular === false || specular <= 0) return outer
   const a = Math.min(specular, 1)
+  // The bright edge faces the light. Without an angle the light sits at the top left, as it always has
+  let bx = 1.5
+  let by = 1.5
+  if (angle !== undefined) {
+    const rad = (angle * Math.PI) / 180
+    bx = -Math.sin(rad) * 2.12
+    by = Math.cos(rad) * 2.12
+  }
+  const round = (n: number) => Math.round(n * 100) / 100
   return [
     `inset 0 0 0 0.5px rgba(255, 255, 255, ${0.5 * a})`,
-    `inset 1.5px 1.5px 1px -1px rgba(255, 255, 255, ${a})`,
-    `inset -1.5px -1.5px 1px -1px rgba(255, 255, 255, ${0.6 * a})`,
+    `inset ${round(bx)}px ${round(by)}px 1px -1px rgba(255, 255, 255, ${a})`,
+    `inset ${round(-bx)}px ${round(-by)}px 1px -1px rgba(255, 255, 255, ${0.6 * a})`,
     outer,
   ].join(', ')
 }

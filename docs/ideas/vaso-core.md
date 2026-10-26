@@ -1,7 +1,7 @@
 # Idea: `vaso/core` — framework-agnostic glass engine
 
-Status: first step landed on the `vaso-core` branch: `createGlass` in `src/core`, with `<Vaso>` as a thin
-wrapper around it. Next: `vaso/element`, then the lab features (`VasoGroup`, `pressable`, `light`, `material`).
+Status: `createGlass` landed (#15). The `glass-features` branch adds `createGlassGroup` / `<VasoGroup>` (merging
+glass), `pressable`, `ripple` and `light`. Next: `material` presets, `shape="text"`, then `vaso/element`.
 
 ## Why
 

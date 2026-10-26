@@ -21,6 +21,7 @@ import { LiquidTouch } from '../lab/sections/liquid-touch'
 import { Materials } from '../lab/sections/materials'
 import { AdaptiveInk } from '../lab/sections/adaptive'
 import { useChromium } from '../lab/ui'
+import { RECIPES, type Recipe } from '../lab/recipes'
 
 import '../styles/globals.css'
 import '../styles/page.css'
@@ -41,6 +42,7 @@ function DemoCard({
   caption,
   wide,
   preview,
+  recipe,
   align = 'center',
   children,
 }: {
@@ -49,6 +51,8 @@ function DemoCard({
   wide?: boolean
   /** Not in the package yet: built on the lab engine, headed for vaso/core */
   preview?: boolean
+  /** How it's made: a sentence and a snippet, shown under the demo */
+  recipe?: Recipe
   align?: 'start' | 'center'
   children: React.ReactNode
 }) {
@@ -64,6 +68,20 @@ function DemoCard({
         {caption && <> · {caption}</>}
       </figcaption>
       <div className={`flex ${align === 'center' ? 'justify-center' : 'justify-start'}`}>{children}</div>
+      {recipe && (
+        <div className="demo-how">
+          <p className="text-xs leading-relaxed theme-label">
+            {/* `backticks` in the text become inline code */}
+            {recipe.how.split('`').map((part, i) => (i % 2 ? <code key={i} className="font-semibold theme-heading">{part}</code> : part))}
+          </p>
+          <details>
+            <summary className="text-xs font-semibold theme-heading">Code</summary>
+            <div className="mt-3">
+              <CodeBlock filename={recipe.filename} code={recipe.code} />
+            </div>
+          </details>
+        </div>
+      )}
     </figure>
   )
 }
@@ -112,37 +130,37 @@ function Home() {
             <section id="examples" className="relative border-b pb-6 theme-section">
               <h2 className="text-lg font-semibold mb-1 theme-heading">Examples</h2>
               <p className="text-xs theme-label mb-4">
-                Preview: coming in vaso/core{!chromium && ', refracts in Chromium browsers for now'}
+                Preview: not in the package yet{!chromium && ', refracts in Chromium browsers for now'}
               </p>
 
               {/* The big ones, one per row */}
               <div className="grid grid-cols-1 gap-y-16 pt-8 border-t border-[var(--theme-border-color)]">
-                <DemoCard title="Liquid search" caption="matches light up with glass that flows between them" preview>
+                <DemoCard title="Liquid search" caption="matches light up with glass that flows between them" recipe={RECIPES.search}>
                   <div className="lab-frame">
                     <LiquidSearch />
                   </div>
                 </DemoCard>
-                <DemoCard title="Crystal balls">
+                <DemoCard title="Crystal balls" recipe={RECIPES.crystal}>
                   <GlassScope id="crystal" label="Crystal balls">
                     <CrystalBalls />
                   </GlassScope>
                 </DemoCard>
-                <DemoCard title="Liquid touch" caption="press and drag" preview>
+                <DemoCard title="Liquid touch" caption="press and drag" recipe={RECIPES.touch}>
                   <div className="lab-frame">
                     <LiquidTouch />
                   </div>
                 </DemoCard>
-                <DemoCard title="Frosted glass" caption="toggle frost on every glass">
+                <DemoCard title="Frosted glass" caption="toggle frost on every glass" recipe={RECIPES.frosted}>
                   <GlassScope id="frosted" label="Frosted glass">
                     <FrostedCard />
                   </GlassScope>
                 </DemoCard>
-                <DemoCard title="Materials" caption="same optics, different matter" preview>
+                <DemoCard title="Materials" caption="same optics, different matter" preview recipe={RECIPES.materials}>
                   <div className="lab-frame">
                     <Materials />
                   </div>
                 </DemoCard>
-                <DemoCard title="Adaptive ink" caption="the bars pick their ink from what scrolls beneath" preview>
+                <DemoCard title="Adaptive ink" caption="the bars pick their ink from what scrolls beneath" preview recipe={RECIPES.adaptive}>
                   <div className="lab-frame">
                     <AdaptiveInk />
                   </div>
@@ -151,27 +169,27 @@ function Home() {
 
               {/* The small ones, packed two to a row */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-12 mt-16 pt-10 border-t border-[var(--theme-border-color)]">
-                <DemoCard title="Segmented control" caption="the pill bounces into place">
+                <DemoCard title="Segmented control" caption="the pill bounces into place" recipe={RECIPES.segmented}>
                   <GlassScope id="segmented" label="Segmented control">
                     <SegmentedControl />
                   </GlassScope>
                 </DemoCard>
-                <DemoCard title="Resizable glass" caption="drag the handle">
+                <DemoCard title="Resizable glass" caption="drag the handle" recipe={RECIPES.resizable}>
                   <GlassScope id="resizable" label="Resizable glass">
                     <ResizableGlass />
                   </GlassScope>
                 </DemoCard>
-                <DemoCard title="Color picker" caption="drag the lens">
+                <DemoCard title="Color picker" caption="drag the lens" recipe={RECIPES.color}>
                   <GlassScope id="color" label="Color picker">
                     <ColorPicker />
                   </GlassScope>
                 </DemoCard>
-                <DemoCard title="Notification">
+                <DemoCard title="Notification" recipe={RECIPES.notification}>
                   <GlassScope id="notification" label="Notification">
                     <ToastStack />
                   </GlassScope>
                 </DemoCard>
-                <DemoCard title="Outset" caption="how far the glass reaches past the letter" wide>
+                <DemoCard title="Outset" caption="how far the glass reaches past the letter" wide recipe={RECIPES.outset}>
                   <GlassScope id="outset" label="Outset">
                     <OutsetGallery />
                   </GlassScope>

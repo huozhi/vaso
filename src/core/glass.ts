@@ -13,6 +13,7 @@ import {
   BEZEL_RATIO,
   createSpecularShadow,
   DISPERSION,
+  drawLiveMap,
   getDisplacementMap,
   getSpectrum,
   MAX_COPY_SPECTRUM_SAMPLES,
@@ -27,6 +28,7 @@ import {
   SPECTRUM_STEP,
 } from './optics'
 import { getSvgBackdropSupport, isWebKit, WEBKIT_MIN_BLUR } from './support'
+import { type Light, lightAngle, watchPointer } from './light'
 
 export type GlassOptions = {
   /** Explicit width of the glass in pixels. Defaults to the element's width */
@@ -49,6 +51,13 @@ export type GlassOptions = {
   dispersion?: number | false
   /** Intensity of the specular rim, 0 to 1, or false. Default 0.5 */
   specular?: number | false
+  /** Where the light comes from: an angle in degrees (0 above, 90 right) or 'pointer' to follow the cursor.
+   * Default top left */
+  light?: Light
+  /** Swell under a press, with a small lens forming under the finger */
+  pressable?: boolean
+  /** Send a ripple through the glass from every tap */
+  ripple?: boolean
 }
 
 export type Glass = {
@@ -82,6 +91,9 @@ type Settings = {
   blur: number
   dispersion: number | false
   specular: number | false
+  light?: Light
+  pressable: boolean
+  ripple: boolean
 }
 
 // A filter primitive as tag and attributes, so the filter can be patched in place instead of rebuilt
@@ -100,6 +112,9 @@ function settle(options: GlassOptions): Settings {
     blur: options.blur ?? 0.1,
     dispersion: options.dispersion ?? 0.5,
     specular: options.specular ?? 0.5,
+    light: options.light,
+    pressable: options.pressable ?? false,
+    ripple: options.ripple ?? false,
   }
 }
 
@@ -166,6 +181,13 @@ export function createGlass(root: HTMLElement, options: GlassOptions = {}): Glas
   let detachCopy: (() => void) | null = null
   let destroyed = false
 
+  // Press and ripples: while either is moving, the map is redrawn every frame with them in it
+  const press = { value: 0, velocity: 0, target: 0, at: { x: 0, y: 0 } }
+  let ripples: { x: number; y: number; t0: number }[] = []
+  let liveHref: string | null = null
+  let liveFrame = 0
+  let liveLast = 0
+
   const settleLater = () => {
     clearTimeout(settleTimer)
     settleTimer = setTimeout(() => measure(true), RESIZE_SETTLE_MS)
@@ -217,7 +239,8 @@ export function createGlass(root: HTMLElement, options: GlassOptions = {}): Glas
 
     const bezel = geometry ? (Math.min(geometry.width, geometry.height) / 2) * BEZEL_RATIO : 0
     // The map stores unit vectors in [-0.5, 0.5], so double the scale to reach full offset
-    const scale = 2 * depth * bezel * REFRACTION
+    // A press deepens the lens as the glass swells
+    const scale = 2 * depth * bezel * REFRACTION * (1 + 0.3 * press.value)
     // Total separation in pixels between the red and violet images at the rim
     // Flat glass doesn't refract, so fade dispersion out as depth approaches zero
     // Small glass has a narrow rim, where extra bands are indistinguishable; each band is a full displacement pass
@@ -248,7 +271,8 @@ export function createGlass(root: HTMLElement, options: GlassOptions = {}): Glas
     style.height = geometry ? `${geometry.height}px` : `calc(100% + ${top + bottom}px)`
     style.backdropFilter = backdropFilter
     style.setProperty('-webkit-backdrop-filter', backdropFilter)
-    style.boxShadow = createSpecularShadow(specular)
+    style.boxShadow = createSpecularShadow(specular, settings.light === undefined ? undefined : lightAngle(settings.light, root.getBoundingClientRect()))
+    style.transform = press.value > 0.001 ? `scale(${1 + 0.035 * press.value})` : ''
     style.borderRadius = settings.radius != null ? `${settings.radius}px` : 'inherit'
 
     if (useCopyFilter && geometry) {
@@ -327,14 +351,14 @@ export function createGlass(root: HTMLElement, options: GlassOptions = {}): Glas
     const scaleOf = (px: number): Attributes => (framed ? { [FRAME_SCALE_ATTRIBUTE]: px } : { scale: px })
     const next: Primitive[] = framed
       ? [
-          ['feImage', { ...inFrame, href: geometry.href, preserveAspectRatio: 'none', result: 'rawMap' }],
+          ['feImage', { ...inFrame, href: liveHref ?? geometry.href, preserveAspectRatio: 'none', result: 'rawMap' }],
           // Rescales the map's axes for a frame of another aspect ratio than the glass's
           ['feColorMatrix', { ...inFrame, [FRAME_AXES_ATTRIBUTE]: '', in: 'rawMap', type: 'matrix', result: 'map' }],
         ]
       : [
           [
             'feImage',
-            { href: geometry.href, x: 0, y: 0, width: geometry.width, height: geometry.height, preserveAspectRatio: 'none', result: 'map' },
+            { href: liveHref ?? geometry.href, x: 0, y: 0, width: geometry.width, height: geometry.height, preserveAspectRatio: 'none', result: 'map' },
           ],
         ]
     if (spectrum) {
@@ -394,6 +418,100 @@ export function createGlass(root: HTMLElement, options: GlassOptions = {}): Glas
     filterPrimitives = next
   }
 
+  // How long a ripple runs, and how fast and wide its ring is
+  const RIPPLE_LIFE = 1.6
+  const RIPPLE_SPEED = 380
+  const RIPPLE_WIDTH = 20
+
+  const live = (now: number) => {
+    liveFrame = 0
+    if (destroyed || !geometry) return
+    const t = now / 1000
+    const dt = Math.min(0.05, t - (liveLast || t))
+    liveLast = t
+    // A slightly underdamped spring, so the glass overshoots a little as it swells and settles
+    press.velocity += ((press.target - press.value) * 300 - press.velocity * 20) * dt
+    press.value += press.velocity * dt
+    ripples = ripples.filter((r) => t - r.t0 < RIPPLE_LIFE)
+    const settled = Math.abs(press.value) < 0.002 && Math.abs(press.velocity) < 0.01 && press.target === 0
+    if (settled && !ripples.length) {
+      press.value = press.velocity = 0
+      liveHref = null
+      liveLast = 0
+      render()
+      return
+    }
+    const { width, height, radius } = geometry
+    const bezel = (Math.min(width, height) / 2) * BEZEL_RATIO
+    const lens = Math.min(52, Math.min(width, height) * 0.35)
+    const pressed = press.value
+    liveHref = drawLiveMap(width, height, radius, bezel, (x, y, inside, out) => {
+      const edge = Math.min(1, Math.max(inside, 0) / 6)
+      for (const r of ripples) {
+        const age = t - r.t0
+        const dx = x - r.x
+        const dy = y - r.y
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1
+        const u = (dist - age * RIPPLE_SPEED) / RIPPLE_WIDTH
+        if (u < -3 || u > 3) continue
+        const wave = Math.sin(u * 2.2) * Math.exp(-u * u) * Math.exp(-age * 1.8) * 0.7 * edge
+        out.x += (dx / dist) * wave
+        out.y += (dy / dist) * wave
+      }
+      // The finger swells the glass under it into a small magnifying lens
+      if (pressed > 0.01) {
+        const dx = x - press.at.x
+        const dy = y - press.at.y
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1
+        const k = Math.exp(-(dist * dist) / (2 * lens * lens)) * Math.min(1, dist / lens) * pressed * 0.4 * edge
+        out.x -= (dx / dist) * k
+        out.y -= (dy / dist) * k
+      }
+    })
+    render()
+    liveFrame = requestAnimationFrame(live)
+  }
+  const animate = () => {
+    if (!liveFrame) liveFrame = requestAnimationFrame(live)
+  }
+
+  // Pointer position in the glass's own pixels (it may be scaled by a CSS transform)
+  const toGlass = (event: PointerEvent) => {
+    const box = root.getBoundingClientRect()
+    const sx = box.width ? root.offsetWidth / box.width : 1
+    const sy = box.height ? root.offsetHeight / box.height : 1
+    return { x: (event.clientX - box.left) * sx + settings.left, y: (event.clientY - box.top) * sy + settings.top }
+  }
+  const onDown = (event: PointerEvent) => {
+    if (!settings.pressable && !settings.ripple) return
+    const at = toGlass(event)
+    if (settings.pressable) {
+      press.target = 1
+      press.at = at
+    }
+    if (settings.ripple) ripples.push({ ...at, t0: performance.now() / 1000 })
+    animate()
+  }
+  const onMove = (event: PointerEvent) => {
+    if (press.target) press.at = toGlass(event)
+  }
+  const onUp = () => {
+    if (!press.target) return
+    press.target = 0
+    animate()
+  }
+  root.addEventListener('pointerdown', onDown)
+  root.addEventListener('pointermove', onMove)
+  for (const type of ['pointerup', 'pointercancel', 'pointerleave'] as const) root.addEventListener(type, onUp)
+
+  // A pointer light only changes the rim, so it skips everything else
+  const shade = () => {
+    if (!destroyed && settings.light === 'pointer') {
+      glassLayer.style.boxShadow = createSpecularShadow(settings.specular, lightAngle('pointer', root.getBoundingClientRect()))
+    }
+  }
+  let unwatch = settings.light === 'pointer' ? watchPointer(shade) : null
+
   const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => measure())
   observer?.observe(root)
   measure()
@@ -419,10 +537,20 @@ export function createGlass(root: HTMLElement, options: GlassOptions = {}): Glas
         // An earlier redraw may have been waiting for the size to settle; a new size cancels it, so ask again
         if (geometry?.stale) settleLater()
       }
+      if (next.light === 'pointer' && !unwatch) unwatch = watchPointer(shade)
+      if (next.light !== 'pointer' && unwatch) {
+        unwatch()
+        unwatch = null
+      }
       render()
     },
     destroy() {
       destroyed = true
+      cancelAnimationFrame(liveFrame)
+      unwatch?.()
+      root.removeEventListener('pointerdown', onDown)
+      root.removeEventListener('pointermove', onMove)
+      for (const type of ['pointerup', 'pointercancel', 'pointerleave'] as const) root.removeEventListener(type, onUp)
       observer?.disconnect()
       clearTimeout(settleTimer)
       detachCopy?.()
