@@ -68,6 +68,8 @@ type Glass = {
   layer: HTMLElement
   /** WebKit's copy filter, written relative to a frame around the copy */
   filter?: SVGFilterElement | null
+  /** Whether the wrapper's own content is refracted too. Default true */
+  ownContent?: boolean
 }
 
 const isTransparent = (color: string) =>
@@ -518,7 +520,8 @@ function createBackdropCopy(glass: Glass) {
   // Copy of the glass's own content, painted above the backdrop copy
   let own: HTMLElement | null = null
   let ownApplied = ''
-  let ownChanged = true
+  const withOwn = glass.ownContent !== false
+  let ownChanged = withOwn
   let lastOwnBuild = -Infinity
   let ownOffset = { x: 0, y: 0 }
   let ownExtent: Extent | undefined
@@ -544,7 +547,7 @@ function createBackdropCopy(glass: Glass) {
       (record) => !isGlassInternal(record.target) && !(record.type === 'attributes' && record.target === glass.wrapper),
     )
   })
-  ownObserver.observe(glass.wrapper, { subtree: true, childList: true, attributes: true, characterData: true })
+  if (withOwn) ownObserver.observe(glass.wrapper, { subtree: true, childList: true, attributes: true, characterData: true })
 
   // A pruned copy doesn't depend on elements it left out that are still away from the glass, such as
   // animations elsewhere on the page. Anything that moves into the region is checked by its new rect

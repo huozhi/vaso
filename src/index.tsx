@@ -5,7 +5,6 @@ import {
   createGlass,
   createGlassGroup,
   initialGlassStyle,
-  supportsBackdropRefraction,
   type Glass,
   type GlassGroup,
   type GlassGroupOptions,
@@ -30,7 +29,7 @@ function useMergedRef(own: React.MutableRefObject<HTMLElement | null>, forwarded
   return merged
 }
 
-// The group a <Vaso> belongs to, if it sits inside a <VasoGroup> that can merge (Chromium)
+// The group a <Vaso> belongs to, if it sits inside a <VasoGroup>
 const GroupContext = createContext<GlassGroup | null>(null)
 
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect
@@ -206,7 +205,7 @@ export type VasoGroupProps<Element extends HTMLElement = HTMLDivElement> = React
 /**
  * Glass that merges: every `<Vaso>` inside becomes part of one glass, and members that come close flow into each
  * other like drops of water. Move members with CSS or any animation library; the group follows them.
- * In browsers without backdrop refraction (Safari, Firefox) members render as standalone glass instead.
+ * Safari and Firefox refract a copy of the backdrop, as a single <Vaso> does there.
  */
 const VasoGroup = React.forwardRef<HTMLElement, VasoGroupProps>(function VasoGroup({
   component: WrapComponent = 'div',
@@ -226,7 +225,6 @@ const VasoGroup = React.forwardRef<HTMLElement, VasoGroupProps>(function VasoGro
   const options: GlassGroupOptions = { smooth, depth, blur, dispersion, specular, light, overflow }
 
   useIsomorphicLayoutEffect(() => {
-    if (!supportsBackdropRefraction()) return
     const created = createGlassGroup(rootRef.current!, options)
     setGroup(created)
     return () => {

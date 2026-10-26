@@ -71,8 +71,8 @@ group follows them every frame.
 | `depth`, `blur`, `dispersion`, `specular`, `light` | | | As on `<Vaso>`, for the whole group (`depth` defaults to `1`) |
 | `overflow` | `number` | `64` | How far past the group's box members may reach and still be glass |
 
-Members keep their own `outset` and `radius`; the group's props decide how the glass looks. Groups need backdrop
-refraction, so in Safari and Firefox the members render as standalone glass instead.
+Members keep their own `outset` and `radius`; the group's props decide how the glass looks. In Safari and Firefox the
+group refracts a copy of the backdrop, like a single `<Vaso>` does there.
 
 ### Browser Support
 
@@ -106,7 +106,7 @@ const member = group.add(document.querySelector('.search-button'))
 member.remove()
 ```
 
-Options are the props above, without `component` and `children`. `createGlassGroup` needs backdrop refraction; check `supportsBackdropRefraction()` and fall back to `createGlass` per member elsewhere. The element's own content stays on top of
+Options are the props above, without `component` and `children`. `createGlassGroup` works in every browser, with the same backdrop copy as `createGlass` in Safari and Firefox. The element's own content stays on top of
 the glass.
 
 ## Examples

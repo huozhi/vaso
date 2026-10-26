@@ -71,7 +71,7 @@ import { Vaso, VasoGroup } from 'vaso'
 
 Group props: `smooth` (neck width in px, default 24), `depth` (default 1), `blur`, `dispersion`, `specular`, `light`,
 `overflow` (how far members may reach past the group's box, default 64). Members keep their own `outset` and `radius`.
-Groups need backdrop refraction (Chromium); in Safari and Firefox members render as standalone glass.
+Groups work in every browser; Safari and Firefox refract a backdrop copy, as a single `<Vaso>` does.
 | `px` / `py` | number | – | – | Deprecated, use `outset={{ x, y }}` |
 
 Exports: `Vaso`, `VasoGroup`, and the types `VasoProps`, `VasoGroupProps`, `Outset`, `Light`. From `vaso/core`: `createGlass`, `createGlassGroup`, `initialGlassStyle`, `resolveOutset`, `supportsBackdropRefraction`, and the types `Glass`, `GlassOptions`, `GlassGroup`, `GlassGroupOptions`, `GroupMember`, `GroupMemberOptions`, `Outset`, `Light`.
