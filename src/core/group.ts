@@ -123,13 +123,14 @@ export function createGlassGroup(root: HTMLElement, options: GlassGroupOptions =
   const copyMode = !getSvgBackdropSupport()
   const framed = copyMode && isWebKit()
   let copyLayer: HTMLElement | null = null
-  let detachCopy: (() => void) | null = null
+  let detachCopy: ReturnType<typeof attachBackdropCopy> | null = null
+  // The part of the layer WebKit filters, in layer pixels, matching the cropped map
+  let area = { x: 0, y: 0, width: 1, height: 1 }
 
   root.insertBefore(layer, root.firstChild)
   if (copyMode) {
-    // Marked as glass, so this copy and the copies of other glasses leave the layer and its rim canvas out
-    layer.setAttribute(GLASS_LAYER_ATTRIBUTE, id)
-    canvas.setAttribute(GLASS_LAYER_ATTRIBUTE, '')
+    // Marked as glass, so this copy and the copies of other glasses leave the layer, rim canvas and filter out
+    for (const el of [layer, canvas, svg]) el.setAttribute(GLASS_LAYER_ATTRIBUTE, el === layer ? id : '')
     // Safari can paint filtered pixels outside the box; the mask keeps them in
     const wrap = document.createElement('span')
     Object.assign(wrap.style, { position: 'absolute', inset: '0', overflow: 'hidden' })
@@ -137,8 +138,8 @@ export function createGlassGroup(root: HTMLElement, options: GlassGroupOptions =
     copyLayer = document.createElement('span')
     Object.assign(copyLayer.style, { position: 'absolute', top: '0', left: '0', overflow: framed ? 'visible' : 'hidden' })
     wrap.appendChild(copyLayer)
-    layer.append(wrap, svg)
-    layer.after(canvas)
+    layer.append(wrap)
+    layer.after(canvas, svg)
   } else {
     layer.after(canvas, svg)
     layer.style.backdropFilter = `url(#${id}) saturate(1.2)`
@@ -300,8 +301,28 @@ export function createGlassGroup(root: HTMLElement, options: GlassGroupOptions =
 
     // Copy what's behind the group into the layer and keep it aligned
     if (copyLayer && !detachCopy) {
-      detachCopy = attachBackdropCopy({ wrapper: root, container: layer, layer: copyLayer, filter: framed ? filter : null, ownContent: false })
+      detachCopy = attachBackdropCopy({
+        wrapper: root,
+        container: layer,
+        layer: copyLayer,
+        filter: framed ? filter : null,
+        ownContent: false,
+        bounds: membersBounds,
+        area: framed ? () => area : undefined,
+      })
     }
+  }
+
+  // Where the members are, in viewport pixels: the part of the backdrop the copy has to cover
+  const membersBounds = () => {
+    const origin = layer.getBoundingClientRect()
+    if (!rects.length) return new DOMRect(origin.left + origin.width / 2, origin.top + origin.height / 2, 0, 0)
+    const reach = bezel * Math.abs(current.depth ?? 1) + 8
+    const x0 = Math.min(...rects.map((r) => r.x - r.width / 2)) - reach
+    const y0 = Math.min(...rects.map((r) => r.y - r.height / 2)) - reach
+    const x1 = Math.max(...rects.map((r) => r.x + r.width / 2)) + reach
+    const y1 = Math.max(...rects.map((r) => r.y + r.height / 2)) + reach
+    return new DOMRect(origin.left + x0, origin.top + y0, x1 - x0, y1 - y0)
   }
 
   const look = (): Look => {
@@ -331,29 +352,47 @@ export function createGlassGroup(root: HTMLElement, options: GlassGroupOptions =
       shapeKey = nextShape
       bezel = rects.length ? Math.max(1, Math.min(...rects.map((r) => (Math.min(r.width, r.height) / 2) * BEZEL_RATIO))) : 1
       field.sample(rects, current.smooth ?? 24)
-      const url = field.draw(bezel)
-      filter.querySelector('feImage')?.setAttribute('href', url)
-      urls.push(url)
-      // Keep the previous map until the new one has decoded
-      while (urls.length > 3) URL.revokeObjectURL(urls.shift()!)
 
       // Only the area around the members is filtered; the rest of the layer costs nothing on the GPU
+      let crop: [number, number, number, number] | undefined
       if (rects.length) {
         const reach = bezel * Math.abs(current.depth ?? 1) + 24
         const x0 = Math.max(0, Math.floor((Math.min(...rects.map((r) => r.x - r.width / 2)) - reach) / REGION_STEP) * REGION_STEP)
         const y0 = Math.max(0, Math.floor((Math.min(...rects.map((r) => r.y - r.height / 2)) - reach) / REGION_STEP) * REGION_STEP)
         const x1 = Math.min(size.width, Math.ceil((Math.max(...rects.map((r) => r.x + r.width / 2)) + reach) / REGION_STEP) * REGION_STEP)
         const y1 = Math.min(size.height, Math.ceil((Math.max(...rects.map((r) => r.y + r.height / 2)) + reach) / REGION_STEP) * REGION_STEP)
-        const next = `${x0},${y0},${Math.max(1, x1 - x0)},${Math.max(1, y1 - y0)}`
-        if (next !== region && !framed) {
-          region = next
-          const [x, y, w, h] = next.split(',')
-          filter.setAttribute('x', x)
-          filter.setAttribute('y', y)
-          filter.setAttribute('width', w)
-          filter.setAttribute('height', h)
+        if (framed) {
+          // WebKit filters on the CPU and its filter region has to be the whole frame, so the primitives are cut
+          // down to the members instead, with the map cropped to the same cells
+          const cw = size.width / field.cols
+          const ch = size.height / field.rows
+          crop = [Math.floor(x0 / cw), Math.floor(y0 / ch), Math.ceil(x1 / cw), Math.ceil(y1 / ch)]
+          crop[2] = Math.max(crop[0] + 1, Math.min(field.cols, crop[2]))
+          crop[3] = Math.max(crop[1] + 1, Math.min(field.rows, crop[3]))
+          area = { x: crop[0] * cw, y: crop[1] * ch, width: (crop[2] - crop[0]) * cw, height: (crop[3] - crop[1]) * ch }
+        } else {
+          const next = `${x0},${y0},${Math.max(1, x1 - x0)},${Math.max(1, y1 - y0)}`
+          if (next !== region) {
+            region = next
+            const [x, y, w, h] = next.split(',')
+            filter.setAttribute('x', x)
+            filter.setAttribute('y', y)
+            filter.setAttribute('width', w)
+            filter.setAttribute('height', h)
+          }
         }
+      } else if (framed) {
+        crop = [0, 0, 1, 1]
+        area = { x: 0, y: 0, width: size.width / field.cols, height: size.height / field.rows }
       }
+
+      const url = field.draw(bezel, crop)
+      filter.querySelector('feImage')?.setAttribute('href', url)
+      urls.push(url)
+      // Keep the previous map until the new one has decoded
+      while (urls.length > 3) URL.revokeObjectURL(urls.shift()!)
+      // The cropped map and the area it covers have to change in the same frame
+      detachCopy?.refresh()
     }
     writeFilter()
 

@@ -59,6 +59,8 @@ export class Field {
   region: Bounds = [0, 0, -1, -1]
   private image: ImageData | null = null
   private bmp: Uint8Array<ArrayBuffer> | null = null
+  private bmpWidth = 0
+  private bmpHeight = 0
 
   resize(width: number, height: number) {
     this.width = width
@@ -114,8 +116,9 @@ export class Field {
 
   /** Displacement map: R/G hold the offset (light bends inward at the bezel), B the coverage that cuts out the
    * shape, A stays opaque so the offsets survive premultiplication. Returned as an uncompressed BMP blob URL:
-   * building it is a byte copy, cheap enough for every frame of an animation. The caller revokes it */
-  draw(bezel: number): string {
+   * building it is a byte copy, cheap enough for every frame of an animation. The caller revokes it.
+   * `crop` limits the image to those cells, [col0, row0, col1, row1) */
+  draw(bezel: number, crop?: Bounds): string {
     const image = this.image!
     const data = image.data
     new Uint32Array(data.buffer).fill(0xff008080)
@@ -141,14 +144,18 @@ export class Field {
         data[o + 2] = coverage * 255
       }
     }
-    return this.toBmpUrl()
+    return this.toBmpUrl(crop ?? [0, 0, this.cols, this.rows])
   }
 
-  private toBmpUrl() {
-    const { width: w, height: h, data } = this.image!
+  private toBmpUrl([c0, r0, c1, r1]: Bounds) {
+    const { width: cols, data } = this.image!
+    const w = Math.max(1, c1 - c0)
+    const h = Math.max(1, r1 - r0)
     const HEADER = 54
     const size = HEADER + w * h * 4
-    if (!this.bmp || this.bmp.byteLength !== size) {
+    if (!this.bmp || this.bmpWidth !== w || this.bmpHeight !== h) {
+      this.bmpWidth = w
+      this.bmpHeight = h
       this.bmp = new Uint8Array(size)
       const view = new DataView(this.bmp.buffer)
       view.setUint8(0, 0x42) // 'B'
@@ -163,11 +170,13 @@ export class Field {
       view.setUint32(34, w * h * 4, true)
     }
     const out = this.bmp
-    for (let i = 0, o = HEADER; i < data.length; i += 4, o += 4) {
-      out[o] = data[i + 2]
-      out[o + 1] = data[i + 1]
-      out[o + 2] = data[i]
-      out[o + 3] = 255
+    for (let y = 0, o = HEADER; y < h; y++) {
+      for (let x = 0, i = ((y + r0) * cols + c0) * 4; x < w; x++, i += 4, o += 4) {
+        out[o] = data[i + 2]
+        out[o + 1] = data[i + 1]
+        out[o + 2] = data[i]
+        out[o + 3] = 255
+      }
     }
     return URL.createObjectURL(new Blob([out], { type: 'image/bmp' }))
   }

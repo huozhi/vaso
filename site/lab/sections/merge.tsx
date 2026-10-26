@@ -9,7 +9,7 @@ import { Ghost, Hint, placeGhost, useFrame, useIdle, useTried } from '../ui'
 
 const MAX_MATCHES = 60
 /** Debounce before glass moves after typing, and after deleting */
-const TYPE_DELAY = 140
+const TYPE_DELAY = 80
 const DELETE_DELAY = 700
 /** How long a highlight takes to shrink away before it's removed */
 const LEAVE_MS = 450
