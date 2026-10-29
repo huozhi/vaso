@@ -137,24 +137,24 @@ function Home() {
 
               {/* The big ones, one per row */}
               <div className="grid grid-cols-1 gap-y-16 pt-8 border-t border-[var(--theme-border-color)]">
-                <DemoCard title="Liquid search" caption="matches light up with glass that flows between them" recipe={RECIPES.search}>
-                  <div className="lab-frame">
-                    <LiquidSearch />
-                  </div>
-                </DemoCard>
-                <DemoCard title="Crystal balls" recipe={RECIPES.crystal}>
-                  <GlassScope id="crystal" label="Crystal balls">
-                    <CrystalBalls />
-                  </GlassScope>
-                </DemoCard>
                 <DemoCard title="Liquid touch" caption="press and drag" recipe={RECIPES.touch}>
                   <div className="lab-frame">
                     <LiquidTouch />
                   </div>
                 </DemoCard>
+                <DemoCard title="Liquid search" caption="matches light up with glass that flows between them" recipe={RECIPES.search}>
+                  <div className="lab-frame">
+                    <LiquidSearch />
+                  </div>
+                </DemoCard>
                 <DemoCard title="Frosted glass" caption="toggle frost on every glass" recipe={RECIPES.frosted}>
                   <GlassScope id="frosted" label="Frosted glass">
                     <FrostedCard />
+                  </GlassScope>
+                </DemoCard>
+                <DemoCard title="Crystal balls" recipe={RECIPES.crystal}>
+                  <GlassScope id="crystal" label="Crystal balls">
+                    <CrystalBalls />
                   </GlassScope>
                 </DemoCard>
                 <DemoCard title="Materials" caption="same optics, different matter" preview recipe={RECIPES.materials}>
