@@ -20,7 +20,6 @@ import { LiquidSearch } from '../lab/sections/merge'
 import { LiquidTouch } from '../lab/sections/liquid-touch'
 import { Materials } from '../lab/sections/materials'
 import { AdaptiveInk } from '../lab/sections/adaptive'
-import { useChromium } from '../lab/ui'
 import { RECIPES, type Recipe } from '../lab/recipes'
 
 import '../styles/globals.css'
@@ -41,7 +40,6 @@ function DemoCard({
   title,
   caption,
   wide,
-  preview,
   recipe,
   align = 'center',
   children,
@@ -49,8 +47,6 @@ function DemoCard({
   title: string
   caption?: string
   wide?: boolean
-  /** Not in the package yet: built on the lab engine, headed for vaso/core */
-  preview?: boolean
   /** How it's made: a sentence and a snippet, shown under the demo */
   recipe?: Recipe
   align?: 'start' | 'center'
@@ -60,11 +56,6 @@ function DemoCard({
     <figure className={`flex flex-col gap-5 min-w-0 ${wide ? 'md:col-span-2' : ''}`}>
       <figcaption className={`text-xs theme-label ${align === 'center' ? 'text-center' : ''}`}>
         <span className="font-semibold theme-heading">{title}</span>
-        {preview && (
-          <span className="ml-2 px-1.5 py-px rounded border border-[var(--theme-border-color)] text-[10px] uppercase tracking-wide">
-            Preview
-          </span>
-        )}
         {caption && <> · {caption}</>}
       </figcaption>
       <div className={`flex ${align === 'center' ? 'justify-center' : 'justify-start'}`}>{children}</div>
@@ -88,7 +79,6 @@ function DemoCard({
 
 function Home() {
   const [theme, setTheme] = useState('light')
-  const chromium = useChromium()
 
   return (
     <>
@@ -130,10 +120,7 @@ function Home() {
 
           <div className="px-4 py-6 lg:p-8 sm:p-4 space-y-8 rounded-lg theme-content">
             <section id="examples" className="relative border-b pb-6 theme-section">
-              <h2 className="text-lg font-semibold mb-1 theme-heading">Examples</h2>
-              <p className="text-xs theme-label mb-4">
-                Preview: not in the package yet{!chromium && ', refracts in Chromium browsers for now'}
-              </p>
+              <h2 className="text-lg font-semibold mb-4 theme-heading">Examples</h2>
 
               {/* The big ones, one per row */}
               <div className="grid grid-cols-1 gap-y-16 pt-8 border-t border-[var(--theme-border-color)]">
@@ -157,12 +144,12 @@ function Home() {
                     <CrystalBalls />
                   </GlassScope>
                 </DemoCard>
-                <DemoCard title="Materials" caption="same optics, different matter" preview recipe={RECIPES.materials}>
+                <DemoCard title="Materials" caption="same optics, different matter" recipe={RECIPES.materials}>
                   <div className="lab-frame">
                     <Materials />
                   </div>
                 </DemoCard>
-                <DemoCard title="Adaptive ink" caption="the bars pick their ink from what scrolls beneath" preview recipe={RECIPES.adaptive}>
+                <DemoCard title="Adaptive ink" caption="the bars pick their ink from what scrolls beneath" recipe={RECIPES.adaptive}>
                   <div className="lab-frame">
                     <AdaptiveInk />
                   </div>
