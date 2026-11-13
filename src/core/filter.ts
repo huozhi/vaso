@@ -176,7 +176,8 @@ export function createCopyLayer() {
  * until something forced a repaint. So a new map is loaded off to the side first; once it has, `onReady` puts it in the
  * filter (`shown`) and the saturation flips by a hair, a different but equivalent CSS filter that makes WebKit rebuild.
  * While maps change every frame (a press, a ripple, highlights moving), any map newer than the one shown is used as
- * soon as it loads, so a slow load never stalls the glass
+ * soon as it loads, so a slow load never stalls the glass.
+ * Groups use it in Chromium as well, which also draws the filter without a map while a new <feImage> href loads
  */
 export function createWebKitMaps(onReady: (href: string) => void) {
   let flipped = false

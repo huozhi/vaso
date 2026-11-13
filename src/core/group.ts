@@ -111,17 +111,21 @@ export function createGlassGroup(root: HTMLElement, options: GlassGroupOptions =
   const applyCopyFilter = () => {
     if (copyLayer && !destroyed) copyLayer.style.filter = `url(#${id}) blur(${copyBlur}px) saturate(${maps.saturation()})`
   }
-  // WebKit's maps load before they're shown, each with the part of the layer it covers (see createWebKitMaps)
+  // Maps load before they're shown (see createWebKitMaps). Chromium too draws the filter without a map while a new
+  // <feImage> href loads, so moving members made the glass flash on every frame. Each map is shown once it has loaded,
+  // together with the part of the layer it was drawn for: WebKit's crop area, or the filter region elsewhere
   const areas = new Map<string, typeof area>()
+  const regions = new Map<string, string>()
   const maps = createWebKitMaps((href) => {
     if (destroyed) return
-    area = areas.get(href) ?? area
+    if (framed) area = areas.get(href) ?? area
+    else applyRegion(regions.get(href))
     filter.querySelector('feImage')?.setAttribute('href', href)
-    // The cropped map and the area it covers change in the same frame
+    // The map and the area it covers change in the same frame
     detachCopy?.refresh()
     applyCopyFilter()
   })
-  const shownMap = () => (framed ? maps.shown() : urls[urls.length - 1])
+  const shownMap = () => maps.shown()
   // The part of the layer WebKit filters, in layer pixels, matching the cropped map
   let area = { x: 0, y: 0, width: 1, height: 1 }
 
@@ -156,6 +160,17 @@ export function createGlassGroup(root: HTMLElement, options: GlassGroupOptions =
   let raf = 0
   let destroyed = false
   const urls: string[] = []
+
+  // The filter region, written only with the map it was drawn for (see maps)
+  const applyRegion = (next?: string) => {
+    if (!next || next === region) return
+    region = next
+    const [x, y, w, h] = next.split(',')
+    filter.setAttribute('x', x)
+    filter.setAttribute('y', y)
+    filter.setAttribute('width', w)
+    filter.setAttribute('height', h)
+  }
 
   const place = () => {
     const pad = `${-overflow()}px`
@@ -304,6 +319,7 @@ export function createGlassGroup(root: HTMLElement, options: GlassGroupOptions =
       // Only the area around the members is filtered; the rest of the layer costs nothing on the GPU
       let crop: [number, number, number, number] | undefined
       let nextArea = area
+      let nextRegion = region
       if (rects.length) {
         const reach = bezel * Math.abs(current.depth ?? 1) + 24
         const x0 = Math.max(0, Math.floor((Math.min(...rects.map((r) => r.x - r.width / 2)) - reach) / REGION_STEP) * REGION_STEP)
@@ -320,15 +336,7 @@ export function createGlassGroup(root: HTMLElement, options: GlassGroupOptions =
           crop[3] = Math.max(crop[1] + 1, Math.min(field.rows, crop[3]))
           nextArea = { x: crop[0] * cw, y: crop[1] * ch, width: (crop[2] - crop[0]) * cw, height: (crop[3] - crop[1]) * ch }
         } else {
-          const next = `${x0},${y0},${Math.max(1, x1 - x0)},${Math.max(1, y1 - y0)}`
-          if (next !== region) {
-            region = next
-            const [x, y, w, h] = next.split(',')
-            filter.setAttribute('x', x)
-            filter.setAttribute('y', y)
-            filter.setAttribute('width', w)
-            filter.setAttribute('height', h)
-          }
+          nextRegion = `${x0},${y0},${Math.max(1, x1 - x0)},${Math.max(1, y1 - y0)}`
         }
       } else if (framed) {
         crop = [0, 0, 1, 1]
@@ -337,17 +345,15 @@ export function createGlassGroup(root: HTMLElement, options: GlassGroupOptions =
 
       const url = field.draw(bezel, crop)
       urls.push(url)
-      if (framed) {
-        // WebKit gets the map once it has loaded, together with the area it covers (see createWebKitMaps)
-        areas.set(url, nextArea)
-        maps.request(url)
-      } else {
-        filter.querySelector('feImage')?.setAttribute('href', url)
-      }
+      // The filter gets the map once it has loaded, together with what it covers (see maps)
+      if (framed) areas.set(url, nextArea)
+      else regions.set(url, nextRegion)
+      maps.request(url)
       // Keep the map on screen, and the ones after it that may still be loading
       while (urls.length > 3 && urls[0] !== shownMap()) {
         const old = urls.shift()!
         areas.delete(old)
+        regions.delete(old)
         URL.revokeObjectURL(old)
       }
     }
