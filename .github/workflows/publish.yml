@@ -1,17 +1,18 @@
 name: Publish
 
-# Run from the Actions tab: pick how to bump the version, and this tags the release and publishes it to npm.
+# Run from the Actions tab: bump and tag a release, or publish the current version with none.
 # Publishing authenticates with npm trusted publishing (OIDC), so no npm token is stored in the repo
 on:
   workflow_dispatch:
     inputs:
       release:
-        description: Version bump
+        description: Version bump (none publishes the current version)
         type: choice
         options:
           - patch
           - minor
           - major
+          - none
         default: patch
 
 permissions:
@@ -49,6 +50,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Bump version
+        if: inputs.release != 'none'
         env:
           RELEASE: ${{ inputs.release }}
         run: |
@@ -61,9 +63,11 @@ jobs:
 
       # Push only after a successful publish, so a failed publish leaves no stray tag
       - run: git push --follow-tags
+        if: inputs.release != 'none'
 
       # Include only feat/fix conventional commits since the previous release.
       - name: Create GitHub release
+        if: inputs.release != 'none'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
