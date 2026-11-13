@@ -5,7 +5,7 @@ import { attachBackdropCopy, GLASS_LAYER_ATTRIBUTE, GLASS_ROOT_ATTRIBUTE } from 
 import {
   createCopyLayer,
   createFilter,
-  createWebKitMaps,
+  createMapLoader,
   dispersionBands,
   filterRegion,
   patchFilter,
@@ -188,8 +188,8 @@ export function createGlass(root: HTMLElement, options: GlassOptions = {}): Glas
   // The copy's CSS filter: the SVG filter, then the frost
   let copyBlur = 0
   const copyFilter = () => `url(#${id}) blur(${copyBlur}px) saturate(${maps.saturation()})`
-  // Show a map only once it has loaded, including in Chromium (see createWebKitMaps)
-  const maps = createWebKitMaps(() => render())
+  // Show a map only once it has loaded, including in Chromium (see createMapLoader)
+  const maps = createMapLoader(() => render())
   let liveFrame = 0
   let liveLast = 0
 
@@ -319,7 +319,8 @@ export function createGlass(root: HTMLElement, options: GlassOptions = {}): Glas
     setAttributes(filter, filterRegion(framed, { x: 0, y: 0, width: geometry.width, height: geometry.height }))
     // Keep the loaded map while a press, ripple or resize draws the next one. Chromium also
     // drops refraction if an unloaded map is put straight into the filter.
-    maps.request(liveHref ?? geometry.href)
+    // `||`, not `??`: drawLiveMap returns '' when it can't get a 2D context, and then the static map should show
+    maps.request(liveHref || geometry.href)
     const href = maps.shown()
     const map: Record<string, string | number> = href ? { href } : {}
     filterPrimitives = patchFilter(

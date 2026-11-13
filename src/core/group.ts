@@ -11,7 +11,7 @@ import { Field, type RoundRect } from './field'
 import {
   createCopyLayer,
   createFilter,
-  createWebKitMaps,
+  createMapLoader,
   dispersionBands,
   filterRegion,
   patchFilter,
@@ -111,12 +111,12 @@ export function createGlassGroup(root: HTMLElement, options: GlassGroupOptions =
   const applyCopyFilter = () => {
     if (copyLayer && !destroyed) copyLayer.style.filter = `url(#${id}) blur(${copyBlur}px) saturate(${maps.saturation()})`
   }
-  // Maps load before they're shown (see createWebKitMaps). Chromium too draws the filter without a map while a new
+  // Maps load before they're shown (see createMapLoader). Chromium too draws the filter without a map while a new
   // <feImage> href loads, so moving members made the glass flash on every frame. Each map is shown once it has loaded,
   // together with the part of the layer it was drawn for: WebKit's crop area, or the filter region elsewhere
   const areas = new Map<string, typeof area>()
   const regions = new Map<string, string>()
-  const maps = createWebKitMaps((href) => {
+  const maps = createMapLoader((href) => {
     if (destroyed) return
     if (framed) area = areas.get(href) ?? area
     else applyRegion(regions.get(href))
