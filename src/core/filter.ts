@@ -170,16 +170,17 @@ export function createCopyLayer() {
 }
 
 /**
- * Maps for WebKit's copy filter. WebKit loads an <feImage> asynchronously and draws the filter without a map until it
+ * Preloaded maps for glass filters. WebKit loads an <feImage> asynchronously and draws the filter without a map until it
  * has, so pointing the filter at a new map made the glass flash empty on every change (every keystroke in a search).
  * It also doesn't repaint an element when only the SVG filter it uses changes, so a changing glass kept its old look
  * until something forced a repaint. So a new map is loaded off to the side first; once it has, `onReady` puts it in the
  * filter (`shown`) and the saturation flips by a hair, a different but equivalent CSS filter that makes WebKit rebuild.
  * While maps change every frame (a press, a ripple, highlights moving), any map newer than the one shown is used as
  * soon as it loads, so a slow load never stalls the glass.
- * Groups use it in Chromium as well, which also draws the filter without a map while a new <feImage> href loads
+ * Chromium also draws the filter without a map while a new <feImage> href loads, so both single glasses and groups
+ * use the loader on every rendering path
  */
-export function createWebKitMaps(onReady: (href: string) => void) {
+export function createMapLoader(onReady: (href: string) => void) {
   let flipped = false
   let requested = 0
   let shownAt = 0

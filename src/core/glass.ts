@@ -5,7 +5,7 @@ import { attachBackdropCopy, GLASS_LAYER_ATTRIBUTE, GLASS_ROOT_ATTRIBUTE } from 
 import {
   createCopyLayer,
   createFilter,
-  createWebKitMaps,
+  createMapLoader,
   dispersionBands,
   filterRegion,
   patchFilter,
@@ -188,8 +188,8 @@ export function createGlass(root: HTMLElement, options: GlassOptions = {}): Glas
   // The copy's CSS filter: the SVG filter, then the frost
   let copyBlur = 0
   const copyFilter = () => `url(#${id}) blur(${copyBlur}px) saturate(${maps.saturation()})`
-  // WebKit shows a map only once it has loaded (see createWebKitMaps); a loaded map renders the glass again
-  const maps = createWebKitMaps(() => render())
+  // Show a map only once it has loaded, including in Chromium (see createMapLoader)
+  const maps = createMapLoader(() => render())
   let liveFrame = 0
   let liveLast = 0
 
@@ -289,7 +289,6 @@ export function createGlass(root: HTMLElement, options: GlassOptions = {}): Glas
       // refraction samples next to the rim, where a rounded edge is transparent and leaves a colored fringe in
       // the bands that bend least. clip-path rounds the filtered output instead
       layerStyle.overflow = framed ? 'visible' : 'hidden'
-      if (framed) maps.request(liveHref ?? geometry.href)
       copyBlur = visibleBlur
       layerStyle.filter = copyFilter()
     }
@@ -318,13 +317,17 @@ export function createGlass(root: HTMLElement, options: GlassOptions = {}): Glas
     // Framed filters keep the whole frame as their region: WebKit misplaces the source for a smaller one.
     // Each primitive is limited to the glass instead, which also keeps the work to the glass's size
     setAttributes(filter, filterRegion(framed, { x: 0, y: 0, width: geometry.width, height: geometry.height }))
-    // WebKit's map is the newest one that has loaded; until the first has, the one requested
-    const href = framed ? maps.shown() || (liveHref ?? geometry.href) : (liveHref ?? geometry.href)
+    // Keep the loaded map while a press, ripple or resize draws the next one. Chromium also
+    // drops refraction if an unloaded map is put straight into the filter.
+    // `||`, not `??`: drawLiveMap returns '' when it can't get a 2D context, and then the static map should show
+    maps.request(liveHref || geometry.href)
+    const href = maps.shown()
+    const map: Record<string, string | number> = href ? { href } : {}
     filterPrimitives = patchFilter(
       filter,
       refractionPrimitives({
         framed,
-        map: framed ? { href } : { href, x: 0, y: 0, width: geometry.width, height: geometry.height },
+        map: framed ? map : { ...map, x: 0, y: 0, width: geometry.width, height: geometry.height },
         scale,
         spread,
         spectrum,
