@@ -30,18 +30,18 @@ jobs:
   publish:
     # Only release from main
     if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           # Release notes need the previous tag and its commit history.
           fetch-depth: 0
 
       # Reads the pnpm version from package.json's packageManager field
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
       # Trusted publishing needs npm 11.5.1 or newer, which ships with Node 24
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
