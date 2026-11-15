@@ -182,6 +182,21 @@ function hasVisibleContent(element: Element, style: CSSStyleDeclaration) {
 
 const TOO_LARGE = 'too-large'
 
+// The copy's root, without children. <body> (or <html>) can be the backdrop when nothing nearer paints behind the
+// glass, but its copy can't be another <body> placed in the page: a nested one is invalid, and browsers refuse
+// aria-hidden on a <body>, so the copy and its controls stayed exposed to assistive technology (see detachClone).
+// It becomes a <div> with the same attributes instead, and since rules written for the tag (`body { ... }`) no
+// longer match, it carries the source's computed styles inline. detachClone and the copy's placement override
+// whatever of those doesn't belong on a copy (position, offsets, size)
+function cloneRoot(source: HTMLElement) {
+  if (source !== document.body && source !== document.documentElement) return source.cloneNode(false) as HTMLElement
+  const root = document.createElement('div')
+  for (const { name, value } of source.attributes) root.setAttribute(name, value)
+  const style = getComputedStyle(source)
+  for (const property of style) root.style.setProperty(property, style.getPropertyValue(property))
+  return root
+}
+
 // Clone `source` without glass layers and without what paints above this glass. Only what lies around the
 // glass is copied; the rest of the source becomes placeholders. Returns null when there is nothing left
 // worth refracting, or TOO_LARGE when even that is too much to clone
@@ -203,7 +218,7 @@ function cloneBackdrop(source: HTMLElement, glass: Glass) {
   const clones = new Map<Element, Element>()
   let pruned = false
   const build = (element: Element, whole: boolean) => {
-    const clone = element.cloneNode(false) as Element
+    const clone = element === source ? cloneRoot(source) : (element.cloneNode(false) as Element)
     clones.set(element, clone)
     if (clones.size > MAX_SOURCE_ELEMENTS) return clone
     for (const child of element.childNodes) {
